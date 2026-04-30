@@ -1,21 +1,21 @@
 {
 	"head": {
-		"title": "SimonAKing",
-		"description": "Author:SimonAKing,Category:Personal Blog",
-		"favicon": "favicon.ico"
+		"title": "XDomHatter",
+		"description": "Author:XDomHatter & SimonAKing,Category:Personal Blog",
+		"favicon": "assets/favicon.ico"
 	},
 	"intro": {
-		"title": "SimonAKing",
-		"subtitle": "Front back left right end engineer",
+		"title": "XDomHatter",
+		"subtitle": "Front back left right - end engineer",
 		"enter": "enter",
-		"supportAuthor": true,
+		"supportAuthor": false,
 		"background": true
 	},
 	"main": {
-		"name": "SimonAKing",
+		"name": "XDomHatter",
 		"signature": "Code & Input & Output",
 		"avatar": {
-			"link": "assets/avatar.jpg",
+			"link": "assets/avatar.PNG",
 			"height": "100",
 			"width": "100"
 		},
@@ -31,12 +31,12 @@
 				"text": "About"
 			},
 			"third": {
-				"href": "mailto:hi@simonaking.com",
+				"href": "mailto:timerfx_@outlook.com",
 				"icon": "email",
 				"text": "Email"
 			},
 			"fourth": {
-				"href": "https://github.com/SimonAKing",
+				"href": "https://github.com/XDomHatter",
 				"icon": "github",
 				"text": "Github"
 			}

@@ -10,6 +10,9 @@ const autoprefixer = require('gulp-autoprefixer')
 const connect = require('gulp-connect')
 const pug = require('gulp-pug')
 const less = require('gulp-less')
+const express = require('express')
+const path = require('path');
+
 
 const config = require('./config.json')
 
@@ -19,14 +22,14 @@ gulp.task('clean', function () {
 
 gulp.task('css', function () {
 	return gulp
-	.src('./src/css/*.less')
-	.pipe(less().on('error', function(err) {
-		console.log(err);
-		this.emit('end');
-	}))
-	.pipe(minifycss({ compatibility: 'ie8' }))
-	.pipe(autoprefixer({ overrideBrowserslist: ['last 2 version'] }))
-	.pipe(cssnano({ reduceIdents: false }))
+		.src('./src/css/*.less')
+		.pipe(less().on('error', function (err) {
+			console.log(err);
+			this.emit('end');
+		}))
+		.pipe(minifycss({compatibility: 'ie8'}))
+		.pipe(autoprefixer({overrideBrowserslist: ['last 2 version']}))
+		.pipe(cssnano({reduceIdents: false}))
 		.pipe(gulp.dest('./dist/css'))
 })
 
@@ -41,7 +44,7 @@ gulp.task('html', function () {
 gulp.task('js', function () {
 	return gulp
 		.src('./src/js/*.js')
-		.pipe(babel({ presets: ['@babel/preset-env'] }))
+		.pipe(babel({presets: ['@babel/preset-env']}))
 		.pipe(uglify())
 		.pipe(gulp.dest('./dist/js'))
 })
@@ -49,7 +52,7 @@ gulp.task('js', function () {
 gulp.task('pug', function () {
 	return gulp
 		.src('./src/index.pug')
-		.pipe(pug({ data: config }))
+		.pipe(pug({data: config}))
 		.pipe(gulp.dest('./dist'))
 })
 
@@ -72,4 +75,14 @@ gulp.task('watch', function () {
 		livereload: true,
 		port: 8080
 	})
+})
+
+gulp.task('serve', function () {
+	const app = express();
+	app.set('views', path.join(__dirname, 'dist'))
+	app.use(express.static(path.join(__dirname, 'dist')));
+	app.get('/', (req, res) => {
+		res.render('index', config)
+	})
+	app.listen(80, () => console.log("Server listening on :80"))
 })
