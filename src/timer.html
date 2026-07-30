@@ -640,7 +640,70 @@
 
 
 	<div id="page8" class="page">
-		<h3>数据检验环节</h3>
+		<h3 class="top-text-datacheck">数据检验环节</h3>
+		<div class="timer-display-center" id="timerDisplayDataCheck">5:00</div>
+		<div class="button-group">
+			<button id="startTimerButtonDataCheck" onclick="startTimerDataCheck()">开始计时</button>
+		</div>
+		<style>
+			.top-text-datacheck {
+				font-size: 100px;
+				font-weight: bold;
+				text-align: center;
+				position: fixed;
+				top: 10%; /* 60% from the top of the screen */
+				white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+			}
+
+			.timer-display-center {
+				font-size: 150px;
+				color: #4b6ced;
+				font-weight: bold;
+				text-align: center;
+				position: fixed;
+				top: 42%; /* 60% from the top of the screen */
+				white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+			}
+		</style>
+		<script>
+			var dcremainsec = 300;
+
+			function startTimerDataCheck() {
+				var timerDisplay = document.getElementById("timerDisplayDataCheck");
+				dcremainsec = 300; // Initialize remaining seconds
+				updateDisplay(timerDisplay, dcremainsec);
+
+				// Fetch the audio element for alert sound (end.wav)
+				var alertSound = document.getElementById('alert-sound'); // End sound
+
+				var dcintervals = setInterval(function () {
+					if (dcremainsec > 0) {
+						dcremainsec--;
+
+						// **Immediately change timer color to red at 10 seconds**
+						if (dcremainsec === 10) {
+							timerDisplay.style.color = "red";  // Turn timer text red
+						}
+
+						// **Update the display**
+						updateDisplay(timerDisplay, dcremainsec);
+					} else {
+						clearInterval(dcintervals);
+
+						// **Play alert sound twice when time is up**
+						alertSound.play();  // First play
+						setTimeout(function () {
+							alertSound.currentTime = 0;  // Reset audio
+							alertSound.play();  // Play it again
+						}, 200);  // Slight delay of 300ms before playing again
+
+						timerDisplay.style.color = "red";  // Ensure the timer is red when time is up
+
+						dcremainsec = null;
+					}
+				}, 1000);
+			}
+		</script>
 	</div>
 
 	<div id="page9" class="page">
@@ -761,7 +824,7 @@
 		if (currentPage < totalPages) {
 			if (currentPage === 4) {
 				currentPage = 6
-			}  else {
+			} else {
 				currentPage++;
 			}
 			showPage(currentPage);
@@ -770,7 +833,7 @@
 
 	function prevPage() {
 		if (currentPage > 0) {
-			 if (currentPage === 6) {
+			if (currentPage === 6) {
 				currentPage = 4
 			} else {
 				currentPage--;
