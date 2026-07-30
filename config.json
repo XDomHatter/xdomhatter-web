@@ -21,9 +21,9 @@
 		},
 		"ul": {
 			"first": {
-				"href": "blog/",
+				"href": "timer/",
 				"icon": "bokeyuan",
-				"text": "Blog"
+				"text": "Timer"
 			},
 			"second": {
 				"href": "about/",

@@ -56,13 +56,19 @@ gulp.task('pug', function () {
 		.pipe(gulp.dest('./dist'))
 })
 
+gulp.task('timer', function () {
+	return gulp
+		.src('./src/timer.html')
+		.pipe(gulp.dest('./dist'))
+})
+
 gulp.task('assets', function () {
 	return gulp
 		.src(['./src/assets/**/*'])
 		.pipe(gulp.dest('./dist/assets'));
 })
 
-gulp.task('build', gulp.series('clean', 'assets', 'pug', 'css', 'js', 'html'))
+gulp.task('build', gulp.series('clean', 'assets', 'pug', 'css', 'js', 'html', 'timer'))
 gulp.task('default', gulp.series('build'))
 
 gulp.task('watch', function () {
@@ -77,12 +83,29 @@ gulp.task('watch', function () {
 	})
 })
 
+// gulp.task('serve', function () {
+// 	const app = express();
+// 	app.set('views', path.join(__dirname, 'dist'))
+// 	app.use(express.static(path.join(__dirname, 'dist')));
+// 	app.get('/', (req, res) => {
+// 		res.render('index', config)
+// 	})
+// 	app.listen(80, () => console.log("Server listening on :80"))
+// })
 gulp.task('serve', function () {
-	const app = express();
-	app.set('views', path.join(__dirname, 'dist'))
-	app.use(express.static(path.join(__dirname, 'dist')));
-	app.get('/', (req, res) => {
-		res.render('index', config)
-	})
-	app.listen(80, () => console.log("Server listening on :80"))
-})
+    const app = express();
+
+    const distPath = path.join(__dirname, 'dist');
+
+    app.use(express.static(distPath));
+
+    app.get('/', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+    });
+		
+		app.get('/timer', (req, res) => {
+			res.sendFile(path.join(distPath, 'timer.html'));
+		})
+
+    app.listen(80, () => console.log("Server listening on :80"));
+});

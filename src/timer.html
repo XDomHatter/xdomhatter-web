@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<audio id="alert-sound" src="{% static 'end.wav' %}"></audio>
+
+<head>
+	<title>计时器</title>
+	<style>
+		body, html {
+			height: 100%;
+			margin: 0;
+			font-family: Arial, sans-serif;
+			background-color: #ffffff;
+		}
+
+		.container {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			height: 100%;
+			flex-direction: column;
+			text-align: center;
+		}
+
+		h1 {
+			color: #000000;
+			margin-top: 10px;
+			font-size: 85px;
+		}
+
+		.header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			background-color: #f2f2f2;
+			padding: 10px;
+			font-size: 24px;
+			font-weight: bold;
+			text-align: center;
+			width: 100%;
+			box-sizing: border-box;
+		}
+
+		.header .left-column {
+			flex: 0 0 30%; /* Adjusted width */
+			text-align: left;
+			padding-left: 10px;
+		}
+
+		.header .middle-column {
+			flex: 1; /* This will make the middle-column take up the remaining space */
+			text-align: center;
+			font-size: 30px;
+		}
+
+		.header .right-column {
+			flex: 0 0 30%; /* Adjusted width */
+			text-align: right;
+			padding-right: 20px;
+		}
+
+		h3 {
+			color: #000000;
+			font-size: 90px;
+			font-weight: bold;
+			margin-bottom: 300px;
+		}
+
+		h6 {
+			color: #000000;
+			font-size: 50px;
+			text-align: center;
+			position: fixed;
+			top: 35%; /* Center vertically */
+			left: 50%;
+			transform: translate(-50%, -50%); /* Adjust to exactly center the element */
+			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+		}
+
+
+		h2 {
+			color: #000000;
+			font-size: 80px;
+			font-weight: bold;
+			text-align: center;
+			position: fixed;
+			top: 25%; /* Center vertically */
+			left: 50%;
+			transform: translate(-50%, -50%); /* Adjust to exactly center the element */
+			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+		}
+
+		h4 {
+			color: #000000;
+			font-size: 80px;
+			font-weight: bold;
+			text-align: center;
+			position: fixed;
+			top: 15%; /* Center vertically */
+			left: 50%;
+			transform: translate(-50%, -50%); /* Adjust to exactly center the element */
+			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+		}
+
+		h5 {
+			color: #000000;
+			font-size: 35px;
+			font-weight: bold;
+			text-align: center;
+			position: fixed;
+			top: 52%; /* Center vertically */
+			left: 50%;
+			transform: translate(-50%, -50%); /* Adjust to exactly center the element */
+			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+		}
+
+		.timer-display {
+			font-size: 200px;
+			color: #4b6ced;
+			position: fixed;
+			top: 53%; /* Center vertically */
+			left: 50%; /* Center horizontally */
+			transform: translate(-50%, -50%); /* Adjust to exactly center the element */
+			z-index: 100; /* Ensure it stays on top of other elements */
+			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+			font-weight: bold;
+		}
+
+
+		.button-group {
+			position: fixed;
+			bottom: 200px; /* 200px margin from the bottom */
+			left: 50%; /* Center horizontally */
+			transform: translateX(-50%); /* Adjust to exactly center the button */
+		}
+
+		.button-group button {
+			background-color: #000000;
+			color: #ffffff;
+			font-size: 16px;
+			font-weight: bold;
+			padding: 10px 20px;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+
+		}
+
+		.button-group button:hover {
+			background-color: #333333;
+		}
+
+
+		.custom-button-group {
+			display: flex;
+			justify-content: center;
+			margin-top: 20px;
+		}
+
+		.custom-button {
+			background-color: #000000;
+			color: #ffffff;
+			font-size: 16px;
+			font-weight: bold;
+			padding: 10px 20px;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+			margin: 0 10px;
+			margin-bottom: 100px;
+			margin-top: 30px;
+		}
+
+		.custom-button:hover {
+			background-color: #333333;
+		}
+
+		.nav-buttons {
+			display: flex;
+			justify-content: space-between;
+			width: 100%;
+			padding: 20px;
+			position: fixed;
+			bottom: 10px; /* Ensure navigation buttons stay visible */
+		}
+
+		.nav-buttons button {
+			background-color: #000000;
+			color: #ffffff;
+			font-size: 18px; /* Slightly larger font for nav buttons */
+			font-weight: bold;
+			padding: 12px 25px; /* Larger padding for nav buttons */
+			border: none;
+			border-radius: 6px;
+			cursor: pointer;
+			margin: 0 10px;
+			margin-right: 40px;
+		}
+
+
+		.input-box {
+			flex: 0 0 45%; /* 48% width for each column */
+			margin-bottom: 30px;
+		}
+
+		.input-box label {
+			display: block;
+			margin-bottom: 10px;
+			color: #000000;
+		}
+
+		.input-box input {
+			width: 100%;
+			padding: 10px;
+			border: 2px solid #000;
+			border-radius: 5px;
+			font-size: 16px;
+		}
+
+		.page {
+			display: none;
+			padding-top: 0px;
+		}
+
+
+		.visible {
+			display: flex;
+			flex-direction: column;
+			justify-content: center; /* Centers the content vertically */
+			align-items: center;
+			height: 100%; /* Ensure the visible page takes full height */
+			text-align: center;
+			padding: 0; /* Remove any extra padding */
+		}
+
+		/* 顶部的正方/反方设计 */
+		.debate-header {
+			display: flex;
+			justify-content: space-between;
+			width: 100%;
+			padding: 20px;
+			box-sizing: border-box;
+		}
+
+		.debate-header .aff {
+			background-color: #4b6ced;
+			color: white;
+			width: 50%;
+			text-align: center;
+			padding: 20px;
+			font-size: 24px;
+			font-weight: bold;
+		}
+
+		.debate-header .neg {
+			background-color: #ffffff;
+			color: white;
+			width: 50%;
+			text-align: right;
+			padding: 20px;
+			font-size: 24px;
+			font-weight: bold;
+		}
+
+		.debate-section {
+			display: flex;
+			justify-content: space-between;
+			padding: 20px;
+		}
+
+		.side {
+			width: 45%;
+		}
+
+		.zhengfang {
+			text-align: left;
+		}
+
+		.fanfang {
+			text-align: right;
+		}
+
+
+		label {
+			font-weight: bold;
+		}
+
+
+		/* For two-column layout */
+		.input-container {
+			display: flex;
+			justify-content: space-between;
+			flex-wrap: wrap;
+			width: 80%; /* Adjust width for better layout */
+		}
+
+		input[type="text"] {
+			width: 100%;
+			padding: 8px;
+			margin-top: 5px;
+			box-sizing: border-box;
+		}
+
+
+		/* Prevent scrolling */
+		html, body {
+			overflow: hidden; /* Disable both vertical and horizontal scrolling */
+			height: 100%; /* Ensure body takes up the full height */
+			width: 100%; /* Ensure body takes up the full width */
+			margin: 0; /* Remove default margin to avoid overflow */
+			padding: 0; /* Remove padding to avoid overflow */
+		}
+
+		/* Make sure the content fits within the screen */
+		.container {
+			width: 100%;
+			height: 100%;
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+		}
+
+
+		.stances {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 10px;
+			width: 100%; /* Ensure it takes the full width */
+		}
+
+		.left-stance {
+			flex: 0 0 30%;
+			text-align: left;
+			font-size: 24px;
+			font-weight: bold;
+			padding-left: 10px;
+			color: #303030; /* Dark grey color */
+		}
+
+		.right-stance {
+			flex: 0 0 30%;
+			text-align: right;
+			font-size: 24px;
+			font-weight: bold;
+			padding-right: 40px;
+			color: #303030; /* Dark grey color */
+		}
+
+		/* Right-side heading (反方申论) */
+		/* Flexbox container to align both headings and 发言方 */
+		.debate-headings {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			position: fixed;
+			top: 20%; /* Adjust vertical alignment */
+			width: 100%; /* Stretch the container across the screen */
+			padding: 0 5%; /* Add some padding to keep it away from the edges */
+			box-sizing: border-box;
+		}
+
+		.heading-left, .heading-right {
+			color: #000000;
+			font-size: 50px;
+			font-weight: bold;
+			white-space: nowrap;
+		}
+
+		.heading-left {
+			text-align: left;
+		}
+
+		.heading-right {
+			text-align: right;
+		}
+
+		#sideTitle1 {
+			color: #000000;
+			font-size: 30px;
+			font-weight: bold;
+			text-align: center;
+			white-space: nowrap;
+		}
+
+		#sideTitle2 {
+			color: #000000;
+			font-size: 30px;
+			font-weight: bold;
+			text-align: center;
+			white-space: nowrap;
+		}
+
+		#sideTitle3 {
+			color: #000000;
+			font-size: 30px;
+			font-weight: bold;
+			text-align: center;
+			white-space: nowrap;
+		}
+
+		#sideTitle4 {
+			color: #000000;
+			font-size: 30px;
+			font-weight: bold;
+			text-align: center;
+			white-space: nowrap;
+		}
+
+		.stances2 {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 10px;
+			width: 100%; /* Ensure it takes the full width */
+		}
+
+		.left-stance2 {
+			font-size: 50px;
+			color: #000000;
+			font-weight: bold;
+			text-align: right;
+			position: fixed;
+			top: 40%; /* 20% from the top of the screen */
+			left: 20%; /* Position 5% from the right side */
+			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+		}
+
+		.right-stance2 {
+			color: #000000;
+			font-size: 50px;
+			font-weight: bold;
+			text-align: left;
+			position: fixed;
+			top: 40%; /* 20% from the top of the screen */
+			right: 20%; /* Position 5% from the left side */
+			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+		}
+
+
+		.timer-display-left {
+			font-size: 200px;
+			color: #4b6ced;
+			font-weight: bold;
+			text-align: center;
+			position: fixed;
+			top: 47%; /* 20% from the top of the screen */
+			left: 5%; /* Position 5% from the right side */
+			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+		}
+
+		.timer-display-right {
+			font-size: 200px;
+			color: #4b6ced;
+			font-weight: bold;
+			text-align: center;
+			position: fixed;
+			top: 47%; /* 20% from the top of the screen */
+			right: 5%; /* Position 5% from the right side */
+			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
+		}
+
+		/*背板*/
+		body {
+			/*background-image: url({% static 'bg.jpg' %}); !* Path to your image *!*/
+			background-size: cover; /* Ensures the image covers the entire screen */
+			background-position: center; /* Centers the background image */
+			background-repeat: no-repeat; /* Prevents the image from repeating */
+			background-attachment: fixed; /* Makes the background stay fixed when scrolling */
+			margin: 0; /* Removes default body margin */
+			padding: 0; /* Removes default body padding */
+		}
+
+
+	</style>
+</head>
+
+<body>
+<div class="header">
+	<div class="left-column" id="team-aff-header"> 正方</div>
+	<div class="middle-column">渤海杯</div>
+	<div class="right-column" id="team-neg-header"> 反方</div>
+</div>
+<div class="stances">
+	<div class="left-stance" id="stance-aff"> 持方</div>
+	<div class="right-stance" id="stance-neg"> 持方</div>
+</div>
+
+
+<div class="container">
+
+	<!-- 输入页面 -->
+	<div id="page0" class="page visible">
+		<p>快捷键使用: 按键 Enter = 开始计时 ; 按键 c = 切换（仅限对辩和自由辩） ; 按键 p = 暂停/恢复 ; 按键 r = 重置 ;
+			左右箭头 = 换页</p>
+		<p>注：键盘设置为小写才可用</p>
+		<div class="input-container">
+			<div class="input-box">
+				<label for="debate-number">辩论赛序号</label>
+				<input type="text" id="debate-number" placeholder="例如：A1">
+			</div>
+
+			<div class="input-box">
+				<label for="team-aff">正方队伍</label>
+				<input type="text" id="team-aff" placeholder="名字">
+			</div>
+
+			<!-- 评委名字 -->
+			<div class="input-box">
+				<label for="judge1">评委名字1</label>
+				<input type="text" id="judge1" placeholder="请输入评委名字1">
+			</div>
+
+
+			<div class="input-box">
+				<label for="team-neg">反方队伍</label>
+				<input type="text" id="team-neg" placeholder="名字">
+			</div>
+			<div class="input-box">
+				<label for="judge2">评委名字2（如有）</label>
+				<input type="text" id="judge2" placeholder="请输入评委名字2">
+			</div>
+
+			<div class="input-box">
+				<label for="stance-aff-input">正方持方</label>
+				<input type="text" id="stance-aff-input" placeholder="请输入完整持方；例如: 渤海杯是世界第一好的辩论赛">
+			</div>
+			<div class="input-box">
+				<label for="judge3">评委名字3（如有）</label>
+				<input type="text" id="judge3" placeholder="请输入评委名字3">
+			</div>
+
+			<div class="input-box">
+				<label for="stance-neg-input">反方持方</label>
+				<input type="text" id="stance-neg-input"
+				       placeholder="请输入完整持方；例如: 渤海杯是宇宙第一好的辩论赛">
+			</div>
+		</div>
+
+		<div class="custom-button-group">
+			<button class="custom-button" onclick="saveData()">保存并继续</button>
+		</div>
+
+	</div>
+
+	<div id="page1" class="page">
+		<h3>渤海杯辩论赛 <br> <span id="debate-number-display"></span></h3>
+	</div>
+
+	<div id="page2" class="page">
+		<h3>辩手及评委介绍</h3>
+	</div>
+
+	<!-- 大环节一:立论与质询 -->
+	<div id="page3" class="page">
+		<h4>立论</h4>
+		<div class="stances2">
+			<div class="left-stance2" id="stance-aff">正方</div>
+			<div class="right-stance2" id="stance-neg">反方</div>
+		</div>
+		<div class="timer-display-left" id="timerDisplay3-1">3:30</div>
+		<div class="timer-display-right" id="timerDisplay3-2">3:30</div>
+		<h4 id="sideTitle1">发言方：正方</h4>
+		<div class="button-group">
+			<button id="startTimerButton3" onclick="startTimerone()">开始计时</button>
+			<button id="changeButton3" onclick="changeSideone()">切换</button>
+			<button id="pauseResumeButton3" onclick="pauseResumeTimerone()">暂停/恢复</button>
+			<button id="resetButton3" onclick="resetTimersone()">重置</button>
+		</div>
+	</div>
+
+
+	<!-- 大环节二:自由时间-->
+	<div id="page4" class="page">
+		<h4>自由时间</h4>
+		<div class="stances2">
+			<div class="left-stance2" id="stance-aff">正方</div>
+			<div class="right-stance2" id="stance-neg">反方</div>
+		</div>
+		<div class="timer-display-left" id="timerDisplay4-1">11:00</div>
+		<div class="timer-display-right" id="timerDisplay4-2">11:00</div>
+		<h4 id="sideTitle2">发言方：正方</h4>
+		<div class="button-group">
+			<button id="startTimerButton4" onclick="startTimertwo()">开始计时</button>
+			<button id="changeButton4" onclick="changeSidetwo()">切换</button>
+			<button id="pauseResumeButton4" onclick="pauseResumeTimertwo()">暂停/恢复</button>
+			<button id="resetButton4" onclick="resetTimerstwo()">重置</button>
+		</div>
+	</div>
+
+	<!-- 大环节三: 战术暂停 -->
+	<div id="page5" class="page">
+		<h2>战术暂停</h2>
+		<div class="timer-display" id="timerDisplay5-1">5:00</div>
+		<div class="button-group">
+			<button id="startTimerButton5" onclick="startTimer('5-1', 300)">开始计时</button>
+			<button id="pauseResumeButton5" onclick="pauseResumeTimer('5-1')">暂停/恢复</button>
+			<button id="resetButton5" onclick="resetTimer('5-1', 300)">重置</button>
+		</div>
+	</div>
+
+
+	<!-- 大环节四:自由辩论-->
+	<div id="page6" class="page">
+		<h4>自由辩论</h4>
+		<div class="stances2">
+			<div class="left-stance2" id="stance-aff">正方</div>
+			<div class="right-stance2" id="stance-neg">反方</div>
+		</div>
+		<div class="timer-display-left" id="timerDisplay6-1">4:00</div>
+		<div class="timer-display-right" id="timerDisplay6-2">4:00</div>
+		<h4 id="sideTitle3">发言方：正方</h4>
+		<div class="button-group">
+			<button id="startTimerButton6" onclick="startTimerZiyou()">开始计时</button>
+			<button id="changeButton6" onclick="changeSideZiyou()">切换</button>
+			<button id="pauseResumeButton6" onclick="pauseResumeTimerZiyou()">暂停/恢复</button>
+			<button id="resetButton6" onclick="resetTimersZiyou()">重置</button>
+		</div>
+	</div>
+
+
+	<!-- 大环节四:总结陈词-->
+	<div id="page7" class="page">
+		<h4>总结陈词</h4>
+		<div class="stances2">
+			<div class="left-stance2" id="stance-aff">正方</div>
+			<div class="right-stance2" id="stance-neg">反方</div>
+		</div>
+		<div class="timer-display-left" id="timerDisplay7-1">3:30</div>
+		<div class="timer-display-right" id="timerDisplay7-2">3:30</div>
+		<h4 id="sideTitle4">发言方：正方</h4>
+		<div class="button-group">
+			<button id="startTimerButton7" onclick="startTimerlast()">开始计时</button>
+			<button id="changeButton7" onclick="changeSidelast()">切换</button>
+			<button id="pauseResumeButton7" onclick="pauseResumeTimerlast()">暂停/恢复</button>
+			<button id="resetButton7" onclick="resetTimerslast()">重置</button>
+		</div>
+	</div>
+
+
+	<div id="page8" class="page">
+		<h3>数据检验环节</h3>
+	</div>
+
+	<div id="page9" class="page">
+		<h2>评委点评环节</h2>
+		<div id="judges-list">
+			<h5>评委: <span id="judge1-display"></span>
+				评委: <span id="judge2-display"></span>
+				评委: <span id="judge3-display"></span>
+			</h5>
+		</div>
+	</div>
+
+	<div id="page10" class="page">
+		<h3>比赛结束</h3>
+	</div>
+
+	<!-- Add the rest of your pages here -->
+
+	<!-- 页面导航按钮 -->
+	<div class="nav-buttons">
+		<button onclick="prevPage()">⬅上一页</button>
+		<button onclick="nextPage()">下一页➡</button>
+	</div>
+</div>
+
+</body>
+
+<script>
+	var currentPage = 0;
+	var totalPages = 10; // Adjusted to the number of pages
+	var debateData = {}; // Global variable to hold data
+	var intervals = {};  // To store timer intervals for each page
+	var remainingSeconds = {};  // To store remaining time for each timer
+	var isPaused = {};  // To track paused state of timers
+
+	function saveData() {
+		// Save the input data
+		debateData.debateNumber = document.getElementById('debate-number').value;
+		debateData.teamAff = document.getElementById('team-aff').value;
+		debateData.teamNeg = document.getElementById('team-neg').value;
+
+		// Save the stances as well
+		debateData.teamAffStance = document.getElementById('stance-aff-input').value;
+		debateData.teamNegStance = document.getElementById('stance-neg-input').value;
+
+		debateData.judge1 = document.getElementById('judge1').value;
+		debateData.judge2 = document.getElementById('judge2').value;
+		debateData.judge3 = document.getElementById('judge3').value;
+
+
+		// Display the saved team names in the header
+		document.getElementById('team-aff-header').innerText = '正方 ' + debateData.teamAff;
+		document.getElementById('team-neg-header').innerText = '反方 ' + debateData.teamNeg;
+
+		// Display the saved stances in the stance section
+		document.getElementById('stance-aff').innerText = '    ' + debateData.teamAffStance;
+		document.getElementById('stance-neg').innerText = debateData.teamNegStance + '    ';
+
+		// Display the judges' names in the Judges' Commentary section
+		document.getElementById('judge1-display').innerText = debateData.judge1 || '';
+		document.getElementById('judge2-display').innerText = debateData.judge2 || '';
+		document.getElementById('judge3-display').innerText = debateData.judge3 || '';
+
+
+		// Move to the next page
+		updateDisplays();
+		nextPage();
+	}
+
+
+	function showPage(page) {
+		try {
+			stopAllTimers()
+		} catch (e) {
+
+		}
+
+		var pages = document.querySelectorAll('.page');
+		pages.forEach(function (p) {
+			p.classList.remove('visible');  // Hide all pages
+		});
+		document.getElementById('page' + page).classList.add('visible'); // Show the selected page
+
+		// Show the header on all pages
+		document.querySelector('.header').style.display = 'flex';
+
+		// Toggle the nav buttons visibility
+		if (page === 0) {
+			document.querySelector('.nav-buttons').style.display = 'none'; // Hide nav buttons on page 0
+		} else {
+			document.querySelector('.nav-buttons').style.display = 'flex'; // Show nav buttons on other pages
+		}
+
+		// If data has been saved, update the header team names and stances
+		if (debateData.teamAff && debateData.teamNeg) {
+			document.getElementById('team-aff-header').innerText = '正方 ' + debateData.teamAff;
+			document.getElementById('team-neg-header').innerText = debateData.teamNeg + ' 反方';
+
+			document.getElementById('stance-aff').innerText = '持方 ' + debateData.teamAffStance;
+			document.getElementById('stance-neg').innerText = debateData.teamNegStance + ' 持方';
+
+		}
+		if (debateData.judge1 || debateData.judge2 || debateData.judge3) {
+			document.getElementById('judge1-display').innerText = debateData.judge1 || '';
+			document.getElementById('judge2-display').innerText = debateData.judge2 || '';
+			document.getElementById('judge3-display').innerText = debateData.judge3 || '';
+		}
+	}
+
+
+	function updateDisplays() {
+		document.getElementById('debate-number-display').innerText = debateData.debateNumber;
+
+	}
+
+
+	function nextPage() {
+		if (currentPage < totalPages) {
+			if (currentPage === 4) {
+				currentPage = 6
+			}  else {
+				currentPage++;
+			}
+			showPage(currentPage);
+		}
+	}
+
+	function prevPage() {
+		if (currentPage > 0) {
+			 if (currentPage === 6) {
+				currentPage = 4
+			} else {
+				currentPage--;
+			}
+			showPage(currentPage);
+		}
+	}
+
+	// 键盘事件监听器，允许用快捷键控制功能
+	document.addEventListener("keydown", function (event) {
+		switch (event.key) {
+			case "p":  // Pause/Resume with "P" key
+				var pauseResumeButtonId = `pauseResumeButton${currentPage}`;
+				var pauseResumeButton = document.getElementById(pauseResumeButtonId);
+				if (pauseResumeButton) {
+					pauseResumeButton.click();  // Simulate click if button exists
+					document.body.focus();  // Ensure focus stays on the document
+				}
+				event.preventDefault();  // Prevent default action
+				break;
+			case "ArrowLeft":
+				prevPage();  // Go to the previous page
+				event.preventDefault();
+				document.body.focus();  // Ensure focus stays on the document
+				break;
+			case "ArrowRight":
+				nextPage();  // Go to the next page
+				event.preventDefault();
+				document.body.focus();  // Ensure focus stays on the document
+				break;
+			case "r":  // Reset with "R" key
+				var resetButtonId = `resetButton${currentPage}`;
+				var resetButton = document.getElementById(resetButtonId);
+				if (resetButton) {
+					resetButton.click();  // Simulate click if button exists
+					document.body.focus();  // Ensure focus stays on the document
+				}
+				event.preventDefault();  // Prevent default action
+				break;
+			case "Enter":  // Start timer with "T" key
+				var startButtonId = `startTimerButton${currentPage}`;
+				var startButton = document.getElementById(startButtonId);
+				if (startButton) {
+					startButton.click();  // Simulate click if button exists
+					document.body.focus();  // Ensure focus stays on the document
+				}
+				event.preventDefault();  // Prevent default action
+				break;
+			case "c" :  // Change side with C key
+				let changeButton = null;
+				if (currentPage === 4) {
+					changeButton = document.getElementById("changeButton4");
+				} else if (currentPage === 6) {
+					changeButton = document.getElementById("changeButton6");
+				}
+
+				if (changeButton) {
+					changeButton.click();  // Simulate click if button exists
+					document.body.focus();  // Ensure focus stays on the document
+				}
+				event.preventDefault();  // Prevent default action
+				break;
+
+		}
+	});
+
+
+	function startTimer(id, seconds) {
+		var timerDisplay = document.getElementById("timerDisplay" + id);
+		remainingSeconds[id] = seconds; // Initialize remaining seconds
+		updateDisplay(timerDisplay, remainingSeconds[id]);
+
+		// Fetch the audio element for alert sound (end.wav)
+		var alertSound = document.getElementById('alert-sound'); // End sound
+
+		if (!intervals[id]) {
+			intervals[id] = setInterval(function () {
+				if (remainingSeconds[id] > 0) {
+					remainingSeconds[id]--;
+
+					// **Play alert sound when time reaches 30 seconds**
+					if (remainingSeconds[id] === 30) {
+						alertSound.play();  // Play the alert sound
+					}
+
+					// **Immediately change timer color to red at 10 seconds**
+					if (remainingSeconds[id] === 10) {
+						timerDisplay.style.color = "red";  // Turn timer text red
+					}
+
+					// **Update the display**
+					updateDisplay(timerDisplay, remainingSeconds[id]);
+				} else {
+					clearInterval(intervals[id]);
+
+					// **Play alert sound twice when time is up**
+					alertSound.play();  // First play
+					setTimeout(function () {
+						alertSound.currentTime = 0;  // Reset audio
+						alertSound.play();  // Play it again
+					}, 200);  // Slight delay of 300ms before playing again
+
+					timerDisplay.innerText = "时间到!";  // Time's up message
+					timerDisplay.style.color = "red";  // Ensure the timer is red when time is up
+
+					document.getElementById(`pauseResumeButton${currentPage + 1}`).innerText = "暂停";
+					intervals[id] = null;
+				}
+			}, 1000);
+		}
+	}
+
+
+	function pauseResumeTimer(id) {
+		var button = document.getElementById(`pauseResumeButton${currentPage + 1}`);
+		if (isPaused[id]) {
+			// 恢复计时
+			startTimer(id, remainingSeconds[id]);
+		} else {
+			// 暂停计时
+			clearInterval(intervals[id]);
+			intervals[id] = null;
+		}
+		isPaused[id] = !isPaused[id];  // 切换暂停状态
+	}
+
+	function resetTimer(id, defaultTime) {
+		var timerDisplay = document.getElementById("timerDisplay" + id);
+		clearInterval(intervals[id]);
+		intervals[id] = null;
+		remainingSeconds[id] = defaultTime;  // 重置剩余秒数
+		updateDisplay(timerDisplay, defaultTime);
+		document.getElementById(`pauseResumeButton${currentPage + 1}`).innerText = "暂停";
+		isPaused[id] = false;  // 重置为未暂停状态
+	}
+
+	function updateDisplay(timerDisplay, seconds) {
+		var mins = Math.floor(seconds / 60);
+		var secs = seconds % 60;
+		timerDisplay.innerText = `${mins}:${secs < 10 ? '0' + secs : secs}`;
+	}
+
+
+	// Display the first page initially
+	showPage(currentPage);
+
+
+	// Variables for 正方/反方立论与质询 (Page 3)
+	let timerAffOne = 210;  // 正方 timer in seconds (3.5 minutes)
+	let timerNegOne = 210;  // 反方 timer in seconds (3.5 minutes)
+	let currentTimerOne = 'aff';
+	let intervalAffOne = null;
+	let intervalNegOne = null;
+	let isPausedOne = true;
+
+	// Function to start the timer for 正方/反方立论与质询
+	function startTimerone() {
+		var alertSound = document.getElementById('alert-sound'); // End sound for alert
+		if (isPausedOne) {
+			if (currentTimerOne === 'aff') {
+				if (intervalNegOne) clearInterval(intervalNegOne);
+				intervalAffOne = setInterval(function () {
+					if (timerAffOne > 0) {
+						timerAffOne--;
+						updateTimerDisplayOne('3-1', timerAffOne);
+						if (timerAffOne === 30) {
+							alertSound.play();
+						}
+						// Change color and message when time is up
+						if (timerAffOne === 10) {
+							document.getElementById('timerDisplay3-1').style.color = 'red';  // Turn timer red
+						}
+					} else {
+						clearInterval(intervalAffOne);
+
+						// Play alert sound twice when time is up
+						alertSound.play();  // First play
+						setTimeout(function () {
+							alertSound.currentTime = 0;  // Reset audio
+							alertSound.play();  // Play it again
+						}, 200);  // Slight delay before playing again
+
+						// Set the time's up message
+						document.getElementById('timerDisplay3-1').innerText = "时间到!";
+						document.getElementById('timerDisplay3-1').style.color = 'red'; // Ensure red color
+					}
+				}, 1000);
+			} else {
+				if (intervalAffOne) clearInterval(intervalAffOne);
+				intervalNegOne = setInterval(function () {
+					if (timerNegOne > 0) {
+						timerNegOne--;
+						updateTimerDisplayOne('3-2', timerNegOne);
+						if (timerNegOne === 30) {
+							alertSound.play();
+						}
+						// Change color and message when time is up
+						if (timerNegOne === 10) {
+							document.getElementById('timerDisplay3-2').style.color = 'red';  // Turn timer red
+						}
+					} else {
+						clearInterval(intervalNegOne);
+
+						// Play alert sound twice when time is up
+						alertSound.play();  // First play
+						setTimeout(function () {
+							alertSound.currentTime = 0;  // Reset audio
+							alertSound.play();  // Play it again
+						}, 200);  // Slight delay before playing again
+
+						// Set the time's up message
+						document.getElementById('timerDisplay3-2').innerText = "时间到!";
+						document.getElementById('timerDisplay3-2').style.color = 'red'; // Ensure red color
+					}
+				}, 1000);
+			}
+			isPausedOne = false;
+		}
+	}
+
+
+	function pauseResumeTimerone() {
+		if (!isPausedOne) {
+			clearInterval(intervalAffOne);
+			clearInterval(intervalNegOne);
+			isPausedOne = true;
+		} else {
+			startTimerone();
+		}
+	}
+
+	function changeSideone() {
+		pauseResumeTimerone();
+		currentTimerOne = currentTimerOne === 'aff' ? 'neg' : 'aff';
+		document.getElementById('sideTitle1').innerText = currentTimerOne === 'aff' ? '发言方：正方' : '发言方：反方';
+		pauseResumeTimerone();
+	}
+
+	function resetTimersone() {
+		clearInterval(intervalAffOne);
+		clearInterval(intervalNegOne);
+		timerAffOne = 210;
+		timerNegOne = 210;
+		updateTimerDisplayOne('3-1', timerAffOne);
+		updateTimerDisplayOne('3-2', timerNegOne);
+		isPausedOne = true;
+	}
+
+	function updateTimerDisplayOne(timerId, timeLeft) {
+		let minutes = Math.floor(timeLeft / 60);
+		let seconds = timeLeft % 60;
+		document.getElementById('timerDisplay' + timerId).innerText = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+	}
+
+
+	// Variables for 正方/反方自由时间 (Page 4)
+	let timerAffTwo = 660;  // 正方 timer in seconds (11 minutes)
+	let timerNegTwo = 660;  // 反方 timer in seconds (11 minutes)
+	let currentTimerTwo = 'aff';
+	let intervalAffTwo = null;
+	let intervalNegTwo = null;
+	let isPausedTwo = true;
+
+	// Function to start the timer for 正方/反方自由时间
+	function startTimertwo() {
+		var alertSound = document.getElementById('alert-sound'); // End sound for alert
+		if (isPausedTwo) {
+			if (currentTimerTwo === 'aff') {
+				if (intervalNegTwo) clearInterval(intervalNegTwo);
+				intervalAffTwo = setInterval(function () {
+					if (timerAffTwo > 0) {
+						timerAffTwo--;
+						updateTimerDisplayTwo('4-1', timerAffTwo);
+						if (timerAffTwo === 30) {
+							alertSound.play();
+						}
+						// Change color and message when time is up
+						if (timerAffTwo === 10) {
+							document.getElementById('timerDisplay4-1').style.color = 'red';  // Turn timer red
+						}
+					} else {
+						clearInterval(intervalAffTwo);
+
+						// Play alert sound twice when time is up
+						alertSound.play();  // First play
+						setTimeout(function () {
+							alertSound.currentTime = 0;  // Reset audio
+							alertSound.play();  // Play it again
+						}, 200);  // Slight delay before playing again
+
+						// Set the time's up message
+						document.getElementById('timerDisplay4-1').innerText = "时间到!";
+						document.getElementById('timerDisplay4-1').style.color = 'red'; // Ensure red color
+					}
+				}, 1000);
+			} else {
+				if (intervalAffTwo) clearInterval(intervalAffTwo);
+				intervalNegTwo = setInterval(function () {
+					if (timerNegTwo > 0) {
+						timerNegTwo--;
+						updateTimerDisplayTwo('4-2', timerNegTwo);
+						if (timerNegTwo === 30) {
+							alertSound.play();
+						}
+						// Change color and message when time is up
+						if (timerNegTwo === 10) {
+							document.getElementById('timerDisplay4-2').style.color = 'red';  // Turn timer red
+						}
+					} else {
+						clearInterval(intervalNegTwo);
+
+						// Play alert sound twice when time is up
+						alertSound.play();  // First play
+						setTimeout(function () {
+							alertSound.currentTime = 0;  // Reset audio
+							alertSound.play();  // Play it again
+						}, 200);  // Slight delay before playing again
+
+						// Set the time's up message
+						document.getElementById('timerDisplay4-2').innerText = "时间到!";
+						document.getElementById('timerDisplay4-2').style.color = 'red'; // Ensure red color
+					}
+				}, 1000);
+			}
+			isPausedTwo = false;
+		}
+	}
+
+
+	function pauseResumeTimertwo() {
+		if (!isPausedTwo) {
+			clearInterval(intervalAffTwo);
+			clearInterval(intervalNegTwo);
+			isPausedTwo = true;
+		} else {
+			startTimertwo();
+		}
+	}
+
+	function changeSidetwo() {
+		pauseResumeTimertwo();
+		currentTimerTwo = currentTimerTwo === 'aff' ? 'neg' : 'aff';
+		document.getElementById('sideTitle2').innerText = currentTimerTwo === 'aff' ? '发言方：正方' : '发言方：反方';
+		pauseResumeTimertwo();
+	}
+
+	function resetTimerstwo() {
+		clearInterval(intervalAffTwo);
+		clearInterval(intervalNegTwo);
+		timerAffTwo = 660;
+		timerNegTwo = 660;
+		updateTimerDisplayTwo('4-1', timerAffTwo);
+		updateTimerDisplayTwo('4-2', timerNegTwo);
+		isPausedTwo = true;
+	}
+
+	function updateTimerDisplayTwo(timerId, timeLeft) {
+		let minutes = Math.floor(timeLeft / 60);
+		let seconds = timeLeft % 60;
+		document.getElementById('timerDisplay' + timerId).innerText = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+	}
+
+
+	// Variables for 正方/反方自由辩论 (Page 6)
+	let timerAffZiyou = 240;  // 正方 timer in seconds (4 minutes)
+	let timerNegZiyou = 240;  // 反方 timer in seconds (4 minutes)
+	let currentTimerZiyou = 'aff';
+	let intervalAffZiyou = null;
+	let intervalNegZiyou = null;
+	let isPausedZiyou = true;
+
+	// Function to start the timer for 正方/反方自由时间
+	function startTimerZiyou() {
+		var alertSound = document.getElementById('alert-sound'); // End sound for alert
+		if (isPausedZiyou) {
+			if (currentTimerZiyou === 'aff') {
+				if (intervalNegZiyou) clearInterval(intervalNegZiyou);
+				intervalAffZiyou = setInterval(function () {
+					if (timerAffZiyou > 0) {
+						timerAffZiyou--;
+						updateTimerDisplayZiyou('6-1', timerAffZiyou);
+						if (timerAffZiyou === 30) {
+							alertSound.play();
+						}
+						// Change color and message when time is up
+						if (timerAffZiyou === 10) {
+							document.getElementById('timerDisplay6-1').style.color = 'red';  // Turn timer red
+						}
+					} else {
+						clearInterval(intervalAffZiyou);
+
+						// Play alert sound twice when time is up
+						alertSound.play();  // First play
+						setTimeout(function () {
+							alertSound.currentTime = 0;  // Reset audio
+							alertSound.play();  // Play it again
+						}, 200);  // Slight delay before playing again
+
+						// Set the time's up message
+						document.getElementById('timerDisplay6-1').innerText = "时间到!";
+						document.getElementById('timerDisplay6-1').style.color = 'red'; // Ensure red color
+					}
+				}, 1000);
+			} else {
+				if (intervalAffZiyou) clearInterval(intervalAffZiyou);
+				intervalNegZiyou = setInterval(function () {
+					if (timerNegZiyou > 0) {
+						timerNegZiyou--;
+						updateTimerDisplayZiyou('6-2', timerNegZiyou);
+						if (timerNegZiyou === 30) {
+							alertSound.play();
+						}
+						// Change color and message when time is up
+						if (timerNegZiyou === 10) {
+							document.getElementById('timerDisplay6-2').style.color = 'red';  // Turn timer red
+						}
+					} else {
+						clearInterval(intervalNegZiyou);
+
+						// Play alert sound twice when time is up
+						alertSound.play();  // First play
+						setTimeout(function () {
+							alertSound.currentTime = 0;  // Reset audio
+							alertSound.play();  // Play it again
+						}, 200);  // Slight delay before playing again
+
+						// Set the time's up message
+						document.getElementById('timerDisplay6-2').innerText = "时间到!";
+						document.getElementById('timerDisplay6-2').style.color = 'red'; // Ensure red color
+					}
+				}, 1000);
+			}
+			isPausedZiyou = false;
+		}
+	}
+
+
+	function pauseResumeTimerZiyou() {
+		if (!isPausedZiyou) {
+			clearInterval(intervalAffZiyou);
+			clearInterval(intervalNegZiyou);
+			isPausedZiyou = true;
+		} else {
+			startTimerZiyou();
+		}
+	}
+
+	function changeSideZiyou() {
+		pauseResumeTimerZiyou();
+		currentTimerZiyou = currentTimerZiyou === 'aff' ? 'neg' : 'aff';
+		document.getElementById('sideTitle3').innerText = currentTimerZiyou === 'aff' ? '发言方：正方' : '发言方：反方';
+		pauseResumeTimerZiyou();
+	}
+
+	function resetTimersZiyou() {
+		clearInterval(intervalAffZiyou);
+		clearInterval(intervalNegZiyou);
+		timerAffZiyou = 240;
+		timerNegZiyou = 240;
+		updateTimerDisplayZiyou('6-1', timerAffZiyou);
+		updateTimerDisplayZiyou('6-2', timerNegZiyou);
+		isPausedZiyou = true;
+	}
+
+	function updateTimerDisplayZiyou(timerId, timeLeft) {
+		let minutes = Math.floor(timeLeft / 60);
+		let seconds = timeLeft % 60;
+		document.getElementById('timerDisplay' + timerId).innerText = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+	}
+
+
+	// Variables for 正方/反方总结陈词 (Page 3)
+	let timerAffLast = 210;  // 正方 timer in seconds (3.5 minutes)
+	let timerNegLast = 210;  // 反方 timer in seconds (3.5 minutes)
+	let currentTimerLast = 'aff';
+	let intervalAffLast = null;
+	let intervalNegLast = null;
+	let isPausedLast = true;
+
+	// Function to start the timer for 正方/反方立论与质询
+	function startTimerlast() {
+		var alertSound = document.getElementById('alert-sound'); // End sound for alert
+		if (isPausedLast) {
+			if (currentTimerLast === 'aff') {
+				if (intervalNegLast) clearInterval(intervalNegLast);
+				intervalAffLast = setInterval(function () {
+					if (timerAffLast > 0) {
+						timerAffLast--;
+						updateTimerDisplayLast('7-1', timerAffLast);
+						if (timerAffLast === 30) {
+							alertSound.play();
+						}
+						// Change color and message when time is up
+						if (timerAffLast === 10) {
+							document.getElementById('timerDisplay7-1').style.color = 'red';  // Turn timer red
+						}
+					} else {
+						clearInterval(intervalAffLast);
+
+						// Play alert sound twice when time is up
+						alertSound.play();  // First play
+						setTimeout(function () {
+							alertSound.currentTime = 0;  // Reset audio
+							alertSound.play();  // Play it again
+						}, 200);  // Slight delay before playing again
+
+						// Set the time's up message
+						document.getElementById('timerDisplay7-1').innerText = "时间到!";
+						document.getElementById('timerDisplay7-1').style.color = 'red'; // Ensure red color
+					}
+				}, 1000);
+			} else {
+				if (intervalAffLast) clearInterval(intervalAffLast);
+				intervalNegLast = setInterval(function () {
+					if (timerNegLast > 0) {
+						timerNegLast--;
+						updateTimerDisplayLast('7-2', timerNegLast);
+						if (timerNegLast === 30) {
+							alertSound.play();
+						}
+						// Change color and message when time is up
+						if (timerNegLast === 10) {
+							document.getElementById('timerDisplay7-2').style.color = 'red';  // Turn timer red
+						}
+					} else {
+						clearInterval(intervalNegLast);
+
+						// Play alert sound twice when time is up
+						alertSound.play();  // First play
+						setTimeout(function () {
+							alertSound.currentTime = 0;  // Reset audio
+							alertSound.play();  // Play it again
+						}, 200);  // Slight delay before playing again
+
+						// Set the time's up message
+						document.getElementById('timerDisplay7-2').innerText = "时间到!";
+						document.getElementById('timerDisplay7-2').style.color = 'red'; // Ensure red color
+					}
+				}, 1000);
+			}
+			isPausedLast = false;
+		}
+	}
+
+
+	function pauseResumeTimerlast() {
+		if (!isPausedLast) {
+			clearInterval(intervalAffLast);
+			clearInterval(intervalNegLast);
+			isPausedLast = true;
+		} else {
+			startTimerlast();
+		}
+	}
+
+	function changeSidelast() {
+		pauseResumeTimerlast();
+		currentTimerLast = currentTimerLast === 'aff' ? 'neg' : 'aff';
+		document.getElementById('sideTitle4').innerText = currentTimerLast === 'aff' ? '发言方：正方' : '发言方：反方';
+		pauseResumeTimerlast();
+	}
+
+	function resetTimerslast() {
+		clearInterval(intervalAffLast);
+		clearInterval(intervalNegLast);
+		timerAffLast = 210;
+		timerNegLast = 210;
+		updateTimerDisplayOne('7-1', timerAffLast);
+		updateTimerDisplayOne('7-2', timerNegLast);
+		isPausedLast = true;
+	}
+
+	function updateTimerDisplayLast(timerId, timeLeft) {
+		let minutes = Math.floor(timeLeft / 60);
+		let seconds = timeLeft % 60;
+		document.getElementById('timerDisplay' + timerId).innerText = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+	}
+
+	function stopAllTimers() {
+		// 1️⃣ 停止通用计时器
+		for (let key in intervals) {
+			if (intervals[key]) {
+				clearInterval(intervals[key]);
+				intervals[key] = null;
+			}
+		}
+
+		// 2️⃣ 停止立论
+		clearInterval(intervalAffOne);
+		clearInterval(intervalNegOne);
+		isPausedOne = true;
+
+		// 3️⃣ 停止自由时间
+		clearInterval(intervalAffTwo);
+		clearInterval(intervalNegTwo);
+		isPausedTwo = true;
+
+		// 4️⃣ 停止自由辩
+		clearInterval(intervalAffZiyou);
+		clearInterval(intervalNegZiyou);
+		isPausedZiyou = true;
+
+		// 5️⃣ 停止总结陈词
+		clearInterval(intervalAffLast);
+		clearInterval(intervalNegLast);
+		isPausedLast = true;
+	}
+
+
+</script>
+
+
+</html>
