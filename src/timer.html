@@ -667,16 +667,21 @@
 		</style>
 		<script>
 			var dcremainsec = 300;
+			var dcintervals = null;
 
 			function startTimerDataCheck() {
+				clearInterval(dcintervals);
 				var timerDisplay = document.getElementById("timerDisplayDataCheck");
+				var btn = document.getElementById("startTimerButtonDataCheck");
 				dcremainsec = 300; // Initialize remaining seconds
 				updateDisplay(timerDisplay, dcremainsec);
 
 				// Fetch the audio element for alert sound (end.wav)
 				var alertSound = document.getElementById('alert-sound'); // End sound
+				
+				btn.hidden = true;
 
-				var dcintervals = setInterval(function () {
+				dcintervals = setInterval(function () {
 					if (dcremainsec > 0) {
 						dcremainsec--;
 
