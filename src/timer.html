@@ -4,7 +4,8 @@
 <audio id="alert-sound" src="{% static 'end.wav' %}"></audio>
 
 <head>
-	<title>计时器</title>
+	<meta charset="UTF-8">
+	<title>计时器（可DIY环节）</title>
 	<style>
 		body, html {
 			height: 100%;
@@ -129,9 +130,20 @@
 
 		.button-group {
 			position: fixed;
-			bottom: 200px; /* 200px margin from the bottom */
+			bottom: 120px; /* 离底部 120px，给“发言方”提示留出空间 */
 			left: 50%; /* Center horizontally */
 			transform: translateX(-50%); /* Adjust to exactly center the button */
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 8px;
+			z-index: 50;
+		}
+
+		.button-row {
+			display: flex;
+			justify-content: center;
+			gap: 10px;
 		}
 
 		.button-group button {
@@ -155,6 +167,7 @@
 			display: flex;
 			justify-content: center;
 			margin-top: 20px;
+			flex-wrap: wrap;
 		}
 
 		.custom-button {
@@ -314,11 +327,20 @@
 		/* Make sure the content fits within the screen */
 		.container {
 			width: 100%;
-			height: 100%;
+			height: auto;
+			flex: 1;
+			min-height: 0;
 			display: flex;
 			flex-direction: column;
 			justify-content: center;
 			align-items: center;
+		}
+
+		/* 让容器精确占满页头/持方栏以下的剩余视口高度，
+		   这样配置页的内部滚动区域底边正好落在屏幕底部 */
+		body {
+			display: flex;
+			flex-direction: column;
 		}
 
 
@@ -376,38 +398,6 @@
 			text-align: right;
 		}
 
-		#sideTitle1 {
-			color: #000000;
-			font-size: 30px;
-			font-weight: bold;
-			text-align: center;
-			white-space: nowrap;
-		}
-
-		#sideTitle2 {
-			color: #000000;
-			font-size: 30px;
-			font-weight: bold;
-			text-align: center;
-			white-space: nowrap;
-		}
-
-		#sideTitle3 {
-			color: #000000;
-			font-size: 30px;
-			font-weight: bold;
-			text-align: center;
-			white-space: nowrap;
-		}
-
-		#sideTitle4 {
-			color: #000000;
-			font-size: 30px;
-			font-weight: bold;
-			text-align: center;
-			white-space: nowrap;
-		}
-
 		.stances2 {
 			display: flex;
 			justify-content: space-between;
@@ -461,6 +451,40 @@
 			white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
 		}
 
+		/*发言方提示（双方环节），放在按钮行上方，不会被按钮遮挡*/
+		.side-title {
+			color: #000000;
+			font-size: 32px;
+			font-weight: bold;
+			text-align: center;
+			white-space: nowrap;
+		}
+
+		/* 小高度屏幕自动缩小计时字号，避免数字/发言方提示/按钮互相挤压 */
+		@media (max-height: 739px) {
+			.timer-display,
+			.timer-display-left,
+			.timer-display-right {
+				font-size: 160px;
+			}
+		}
+
+		@media (max-height: 669px) {
+			.timer-display,
+			.timer-display-left,
+			.timer-display-right {
+				font-size: 130px;
+			}
+		}
+
+		@media (max-height: 639px) {
+			.timer-display,
+			.timer-display-left,
+			.timer-display-right {
+				font-size: 110px;
+			}
+		}
+
 		/*背板*/
 		body {
 			/*background-image: url({% static 'bg.jpg' %}); !* Path to your image *!*/
@@ -472,6 +496,380 @@
 			padding: 0; /* Removes default body padding */
 		}
 
+
+		/* ===== 配置页卡片化 UI ===== */
+		.config-wrap {
+			width: min(920px, 94%);
+			display: flex;
+			flex-direction: column;
+			gap: 16px;
+			margin: 0 auto;
+		}
+
+		.config-kbd {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			flex-wrap: wrap;
+			gap: 6px 14px;
+			font-size: 13px;
+			color: #6b7280;
+			margin: 0;
+		}
+
+		.config-kbd kbd {
+			background: #eef0f5;
+			border: 1px solid #d9dce5;
+			border-bottom-width: 2px;
+			border-radius: 6px;
+			padding: 2px 8px;
+			font: inherit;
+			font-size: 12px;
+			color: #3b4151;
+		}
+
+		.card {
+			background: #ffffff;
+			border: 1px solid #eaeaf0;
+			border-radius: 16px;
+			padding: 20px 22px;
+			box-shadow: 0 2px 12px rgba(30, 40, 80, 0.06);
+		}
+
+		.card-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: baseline;
+			gap: 12px;
+			margin-bottom: 16px;
+		}
+
+		.card-title {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			font-size: 17px;
+			font-weight: 700;
+			color: #1a1d29;
+		}
+
+		.card-title::before {
+			content: '';
+			width: 4px;
+			height: 18px;
+			border-radius: 2px;
+			background: #4b6ced;
+		}
+
+		.card-sub {
+			font-size: 12px;
+			color: #9aa0b0;
+		}
+
+		.count-badge {
+			background: #eef1fe;
+			color: #4b6ced;
+			font-size: 12px;
+			font-weight: 700;
+			border-radius: 999px;
+			padding: 3px 10px;
+		}
+
+		/* 卡片内输入区（两列网格） */
+		#page0 .input-container {
+			width: 100%;
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 14px 22px;
+		}
+
+		#page0 .input-box {
+			margin-bottom: 0;
+		}
+
+		#page0 .input-box label {
+			display: block;
+			font-size: 13px;
+			font-weight: 600;
+			color: #4a4f5f;
+			margin-bottom: 6px;
+		}
+
+		#page0 .input-box input {
+			width: 100%;
+			padding: 9px 12px;
+			font-size: 14px;
+			color: #1a1d29;
+			background: #fbfbfd;
+			border: 1px solid #dcdde4;
+			border-radius: 10px;
+			box-sizing: border-box;
+			transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+		}
+
+		#page0 .input-box input:hover {
+			border-color: #b9bdc9;
+		}
+
+		#page0 .input-box input:focus {
+			outline: none;
+			background: #ffffff;
+			border-color: #4b6ced;
+			box-shadow: 0 0 0 3px rgba(75, 108, 237, 0.14);
+		}
+
+		@media (max-width: 720px) {
+			#page0 .input-container {
+				grid-template-columns: 1fr;
+			}
+		}
+
+		/* 环节列表 */
+		.stage-list {
+			width: 100%;
+			text-align: left;
+			display: flex;
+			flex-direction: column;
+			gap: 8px;
+		}
+
+		.stage-row {
+			display: flex;
+			align-items: center;
+			gap: 10px;
+			flex-wrap: wrap;
+			background: #f7f8fb;
+			border: 1px solid #eceef3;
+			border-radius: 12px;
+			padding: 8px 10px;
+			transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+			animation: rowIn 0.25s ease;
+		}
+
+		.stage-row:hover {
+			background: #ffffff;
+			border-color: #dcdde4;
+			box-shadow: 0 3px 10px rgba(30, 40, 80, 0.08);
+			transform: translateY(-1px);
+		}
+
+		@keyframes rowIn {
+			from { opacity: 0; transform: translateY(-5px); }
+			to { opacity: 1; transform: translateY(0); }
+		}
+
+		.stage-order {
+			flex: none;
+			width: 26px;
+			height: 26px;
+			border-radius: 50%;
+			background: #eef1fe;
+			color: #4b6ced;
+			font-size: 13px;
+			font-weight: 700;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+		}
+
+		.stage-row input[type="text"],
+		.stage-row select {
+			padding: 7px 10px;
+			font-size: 13px;
+			color: #1a1d29;
+			background: #ffffff;
+			border: 1px solid #dcdde4;
+			border-radius: 9px;
+			box-sizing: border-box;
+			transition: border-color 0.18s ease, box-shadow 0.18s ease;
+		}
+
+		.stage-row input[type="text"]:focus,
+		.stage-row select:focus {
+			outline: none;
+			border-color: #4b6ced;
+			box-shadow: 0 0 0 3px rgba(75, 108, 237, 0.12);
+		}
+
+		.stage-name { width: 190px; flex: 1 1 160px; }
+		.stage-time { width: 86px; }
+		.stage-type { width: 122px; }
+		.stage-start { width: 104px; }
+
+		.stage-ops {
+			display: flex;
+			gap: 4px;
+			margin-left: auto;
+		}
+
+		.icon-btn {
+			width: 30px;
+			height: 30px;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			background: transparent;
+			color: #8a8f9e;
+			border: 1px solid transparent;
+			border-radius: 8px;
+			cursor: pointer;
+			font-size: 13px;
+			transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+		}
+
+		.icon-btn:hover:not(:disabled) {
+			background: #eef1fe;
+			color: #4b6ced;
+			border-color: #d5dcfb;
+		}
+
+		.icon-btn.danger:hover:not(:disabled) {
+			background: #fff0f2;
+			color: #d00030;
+			border-color: #ffd4da;
+		}
+
+		.icon-btn:disabled {
+			opacity: 0.3;
+			cursor: default;
+		}
+
+		/* 卡片内操作按钮 */
+		.config-actions {
+			display: flex;
+			gap: 10px;
+			margin-top: 14px;
+			flex-wrap: wrap;
+		}
+
+		.btn-secondary {
+			background: #ffffff;
+			border: 1px solid #dcdde4;
+			border-radius: 10px;
+			color: #3b4151;
+			font-size: 13px;
+			font-weight: 600;
+			padding: 8px 14px;
+			cursor: pointer;
+			transition: all 0.18s ease;
+		}
+
+		.btn-secondary:hover {
+			border-color: #4b6ced;
+			color: #4b6ced;
+			background: #f6f8ff;
+			transform: translateY(-1px);
+		}
+
+		.btn-secondary.danger:hover {
+			border-color: #d00030;
+			color: #d00030;
+			background: #fff5f6;
+		}
+
+		.hint {
+			font-size: 12px;
+			color: #9aa0b0;
+			margin: 4px 0 0;
+			line-height: 1.6;
+		}
+
+		.empty-hint {
+			text-align: center;
+			padding: 18px;
+			font-size: 13px;
+			color: #9aa0b0;
+		}
+
+		/* 保存栏（悬浮卡片按钮） */
+		.save-bar {
+			position: fixed;
+			bottom: 24px;
+			left: 50%;
+			transform: translateX(-50%);
+			background: rgba(255, 255, 255, 0.92);
+			backdrop-filter: blur(8px);
+			border: 1px solid #e6e7ee;
+			border-radius: 16px;
+			padding: 10px 12px;
+			z-index: 60;
+			box-shadow: 0 10px 30px rgba(20, 30, 70, 0.16);
+		}
+
+		.btn-primary {
+			background: #4b6ced;
+			color: #ffffff;
+			border: none;
+			border-radius: 11px;
+			padding: 12px 38px;
+			font-size: 15px;
+			font-weight: 700;
+			letter-spacing: 1px;
+			cursor: pointer;
+			box-shadow: 0 5px 14px rgba(75, 108, 237, 0.32);
+			transition: all 0.2s ease;
+		}
+
+		.btn-primary:hover {
+			background: #3d5ce0;
+			transform: translateY(-1px);
+			box-shadow: 0 8px 20px rgba(75, 108, 237, 0.38);
+		}
+
+		.btn-primary:active {
+			transform: translateY(0);
+			box-shadow: 0 4px 10px rgba(75, 108, 237, 0.28);
+		}
+
+		/* 配置页背景与滚动 */
+		#page0.visible {
+			background: #f3f4f8;
+			overflow-y: auto;
+			scroll-behavior: smooth;
+			justify-content: flex-start;
+			height: 100%;
+			box-sizing: border-box;
+			padding: 24px 0 150px;
+		}
+
+		#page0.visible::-webkit-scrollbar { width: 8px; }
+		#page0.visible::-webkit-scrollbar-thumb { background: #d4d7e0; border-radius: 4px; }
+		#page0.visible::-webkit-scrollbar-track { background: transparent; }
+
+		/* 流程预设 */
+		.preset-bar {
+			display: flex;
+			gap: 10px;
+			flex-wrap: wrap;
+			margin-bottom: 10px;
+		}
+
+		.preset-bar select,
+		.preset-bar input[type="text"] {
+			flex: 1 1 200px;
+			min-width: 0;
+			padding: 9px 12px;
+			font-size: 14px;
+			color: #1a1d29;
+			background: #fbfbfd;
+			border: 1px solid #dcdde4;
+			border-radius: 10px;
+			box-sizing: border-box;
+			transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+		}
+
+		.preset-bar select:hover,
+		.preset-bar input[type="text"]:hover {
+			border-color: #b9bdc9;
+		}
+
+		.preset-bar select:focus,
+		.preset-bar input[type="text"]:focus {
+			outline: none;
+			background: #ffffff;
+			border-color: #4b6ced;
+			box-shadow: 0 0 0 3px rgba(75, 108, 237, 0.14);
+		}
 
 	</style>
 </head>
@@ -490,56 +888,107 @@
 
 <div class="container">
 
-	<!-- 输入页面 -->
+	<!-- 配置页：队伍信息 + 环节DIY -->
 	<div id="page0" class="page visible">
-		<p>快捷键使用: 按键 Enter = 开始计时 ; 按键 c = 切换（仅限对辩和自由辩） ; 按键 p = 暂停/恢复 ; 按键 r = 重置 ;
-			左右箭头 = 换页</p>
-		<p>注：键盘设置为小写才可用</p>
-		<div class="input-container">
-			<div class="input-box">
-				<label for="debate-number">辩论赛序号</label>
-				<input type="text" id="debate-number" placeholder="例如：A1">
+		<div class="config-wrap">
+
+			<p class="config-kbd">
+				快捷键：
+				<kbd>Enter</kbd> 开始计时
+				<kbd>p</kbd> 暂停/恢复
+				<kbd>r</kbd> 重置
+				<kbd>c</kbd> 切换发言方
+				<kbd>←</kbd><kbd>→</kbd> 换页
+				<span class="card-sub">在输入框中打字不触发快捷键</span>
+			</p>
+
+			<div class="card">
+				<div class="card-header">
+					<span class="card-title">比赛信息</span>
+					<span class="card-sub">队伍 · 评委 · 持方</span>
+				</div>
+				<div class="input-container">
+					<div class="input-box">
+						<label for="debate-number">辩论赛序号</label>
+						<input type="text" id="debate-number" placeholder="例如：A1">
+					</div>
+
+					<div class="input-box">
+						<label for="team-aff">正方队伍</label>
+						<input type="text" id="team-aff" placeholder="名字">
+					</div>
+
+					<div class="input-box">
+						<label for="judge1">评委名字1</label>
+						<input type="text" id="judge1" placeholder="请输入评委名字1">
+					</div>
+
+					<div class="input-box">
+						<label for="team-neg">反方队伍</label>
+						<input type="text" id="team-neg" placeholder="名字">
+					</div>
+					<div class="input-box">
+						<label for="judge2">评委名字2（如有）</label>
+						<input type="text" id="judge2" placeholder="请输入评委名字2">
+					</div>
+
+					<div class="input-box">
+						<label for="stance-aff-input">正方持方</label>
+						<input type="text" id="stance-aff-input" placeholder="请输入完整持方；例如: 渤海杯是世界第一好的辩论赛">
+					</div>
+					<div class="input-box">
+						<label for="judge3">评委名字3（如有）</label>
+						<input type="text" id="judge3" placeholder="请输入评委名字3">
+					</div>
+
+					<div class="input-box">
+						<label for="stance-neg-input">反方持方</label>
+						<input type="text" id="stance-neg-input"
+						       placeholder="请输入完整持方；例如: 渤海杯是宇宙第一好的辩论赛">
+					</div>
+				</div>
 			</div>
 
-			<div class="input-box">
-				<label for="team-aff">正方队伍</label>
-				<input type="text" id="team-aff" placeholder="名字">
+			<div class="card">
+				<div class="card-header">
+					<span class="card-title">流程预设</span>
+					<span class="card-sub">存储 · 复用 · 分享</span>
+				</div>
+				<div class="preset-bar">
+					<select id="preset-select" title="已保存的预设"></select>
+					<button class="btn-secondary" onclick="applyPreset()">加载</button>
+					<button class="btn-secondary danger" onclick="deletePreset()">删除</button>
+				</div>
+				<div class="preset-bar">
+					<input type="text" id="preset-name" placeholder="预设名称，如：渤海杯标准流程" title="预设名称">
+					<button class="btn-secondary" onclick="savePreset()">存为预设</button>
+				</div>
+				<div class="config-actions">
+					<button class="btn-secondary" onclick="exportPresets()">导出全部预设</button>
+					<button class="btn-secondary" onclick="document.getElementById('preset-file').click()">上传预设文件</button>
+					<input type="file" id="preset-file" accept=".json,application/json" style="display:none">
+				</div>
+				<p class="hint">预设只保存环节流程（名称 / 时长 / 类型 / 初始发言方），不保存队伍信息，同名预设会被覆盖。「导出全部预设」生成 JSON 文件，可在其他电脑的计时器里通过「上传预设文件」导入。</p>
 			</div>
 
-			<!-- 评委名字 -->
-			<div class="input-box">
-				<label for="judge1">评委名字1</label>
-				<input type="text" id="judge1" placeholder="请输入评委名字1">
+			<div class="card">
+				<div class="card-header">
+					<span class="card-title">环节设置</span>
+					<span class="count-badge" id="stage-count"></span>
+				</div>
+				<div class="stage-list" id="stage-list"></div>
+				<div class="config-actions">
+					<button class="btn-secondary" onclick="addStage()">＋ 添加环节</button>
+					<button class="btn-secondary" onclick="loadDefaultStages()">恢复默认</button>
+					<button class="btn-secondary danger" onclick="clearStages()">清空环节</button>
+				</div>
+				<p class="hint">时长支持 m:ss 或秒数（如 3:30 或 210）；「双方计时」可切换发言方，「单方计时」为单个倒计时。配置会自动保存在本机浏览器中。</p>
 			</div>
 
-
-			<div class="input-box">
-				<label for="team-neg">反方队伍</label>
-				<input type="text" id="team-neg" placeholder="名字">
-			</div>
-			<div class="input-box">
-				<label for="judge2">评委名字2（如有）</label>
-				<input type="text" id="judge2" placeholder="请输入评委名字2">
-			</div>
-
-			<div class="input-box">
-				<label for="stance-aff-input">正方持方</label>
-				<input type="text" id="stance-aff-input" placeholder="请输入完整持方；例如: 渤海杯是世界第一好的辩论赛">
-			</div>
-			<div class="input-box">
-				<label for="judge3">评委名字3（如有）</label>
-				<input type="text" id="judge3" placeholder="请输入评委名字3">
-			</div>
-
-			<div class="input-box">
-				<label for="stance-neg-input">反方持方</label>
-				<input type="text" id="stance-neg-input"
-				       placeholder="请输入完整持方；例如: 渤海杯是宇宙第一好的辩论赛">
-			</div>
 		</div>
 
-		<div class="custom-button-group">
-			<button class="custom-button" onclick="saveData()">保存并继续</button>
+		<div class="save-bar">
+			<button class="btn-primary" onclick="saveData()">保存并继续</button>
 		</div>
 
 	</div>
@@ -552,166 +1001,10 @@
 		<h3>辩手及评委介绍</h3>
 	</div>
 
-	<!-- 大环节一:立论与质询 -->
-	<div id="page3" class="page">
-		<h4>立论</h4>
-		<div class="stances2">
-			<div class="left-stance2" id="stance-aff">正方</div>
-			<div class="right-stance2" id="stance-neg">反方</div>
-		</div>
-		<div class="timer-display-left" id="timerDisplay3-1">3:30</div>
-		<div class="timer-display-right" id="timerDisplay3-2">3:30</div>
-		<h4 id="sideTitle1">发言方：正方</h4>
-		<div class="button-group">
-			<button id="startTimerButton3" onclick="startTimerone()">开始计时</button>
-			<button id="changeButton3" onclick="changeSideone()">切换</button>
-			<button id="pauseResumeButton3" onclick="pauseResumeTimerone()">暂停/恢复</button>
-			<button id="resetButton3" onclick="resetTimersone()">重置</button>
-		</div>
-	</div>
+	<!-- 各环节页面由 JS 按配置动态生成 -->
+	<div id="dynamic-pages"></div>
 
-
-	<!-- 大环节二:自由时间-->
-	<div id="page4" class="page">
-		<h4>自由时间</h4>
-		<div class="stances2">
-			<div class="left-stance2" id="stance-aff">正方</div>
-			<div class="right-stance2" id="stance-neg">反方</div>
-		</div>
-		<div class="timer-display-left" id="timerDisplay4-1">11:00</div>
-		<div class="timer-display-right" id="timerDisplay4-2">11:00</div>
-		<h4 id="sideTitle2">发言方：正方</h4>
-		<div class="button-group">
-			<button id="startTimerButton4" onclick="startTimertwo()">开始计时</button>
-			<button id="changeButton4" onclick="changeSidetwo()">切换</button>
-			<button id="pauseResumeButton4" onclick="pauseResumeTimertwo()">暂停/恢复</button>
-			<button id="resetButton4" onclick="resetTimerstwo()">重置</button>
-		</div>
-	</div>
-
-	<!-- 大环节三: 战术暂停 -->
-	<div id="page5" class="page">
-		<h2>战术暂停</h2>
-		<div class="timer-display" id="timerDisplay5-1">5:00</div>
-		<div class="button-group">
-			<button id="startTimerButton5" onclick="startTimer('5-1', 300)">开始计时</button>
-			<button id="pauseResumeButton5" onclick="pauseResumeTimer('5-1')">暂停/恢复</button>
-			<button id="resetButton5" onclick="resetTimer('5-1', 300)">重置</button>
-		</div>
-	</div>
-
-
-	<!-- 大环节四:自由辩论-->
-	<div id="page6" class="page">
-		<h4>自由辩论</h4>
-		<div class="stances2">
-			<div class="left-stance2" id="stance-aff">正方</div>
-			<div class="right-stance2" id="stance-neg">反方</div>
-		</div>
-		<div class="timer-display-left" id="timerDisplay6-1">4:00</div>
-		<div class="timer-display-right" id="timerDisplay6-2">4:00</div>
-		<h4 id="sideTitle3">发言方：正方</h4>
-		<div class="button-group">
-			<button id="startTimerButton6" onclick="startTimerZiyou()">开始计时</button>
-			<button id="changeButton6" onclick="changeSideZiyou()">切换</button>
-			<button id="pauseResumeButton6" onclick="pauseResumeTimerZiyou()">暂停/恢复</button>
-			<button id="resetButton6" onclick="resetTimersZiyou()">重置</button>
-		</div>
-	</div>
-
-
-	<!-- 大环节四:总结陈词-->
-	<div id="page7" class="page">
-		<h4>总结陈词</h4>
-		<div class="stances2">
-			<div class="left-stance2" id="stance-aff">正方</div>
-			<div class="right-stance2" id="stance-neg">反方</div>
-		</div>
-		<div class="timer-display-left" id="timerDisplay7-1">3:30</div>
-		<div class="timer-display-right" id="timerDisplay7-2">3:30</div>
-		<h4 id="sideTitle4">发言方：正方</h4>
-		<div class="button-group">
-			<button id="startTimerButton7" onclick="startTimerlast()">开始计时</button>
-			<button id="changeButton7" onclick="changeSidelast()">切换</button>
-			<button id="pauseResumeButton7" onclick="pauseResumeTimerlast()">暂停/恢复</button>
-			<button id="resetButton7" onclick="resetTimerslast()">重置</button>
-		</div>
-	</div>
-
-
-	<div id="page8" class="page">
-		<h3 class="top-text-datacheck">数据检验环节</h3>
-		<div class="timer-display-center" id="timerDisplayDataCheck">5:00</div>
-		<div class="button-group">
-			<button id="startTimerButtonDataCheck" onclick="startTimerDataCheck()">开始计时</button>
-		</div>
-		<style>
-			.top-text-datacheck {
-				font-size: 100px;
-				font-weight: bold;
-				text-align: center;
-				position: fixed;
-				top: 10%; /* 60% from the top of the screen */
-				white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
-			}
-
-			.timer-display-center {
-				font-size: 150px;
-				color: #4b6ced;
-				font-weight: bold;
-				text-align: center;
-				position: fixed;
-				top: 42%; /* 60% from the top of the screen */
-				white-space: nowrap; /* Prevent the text from wrapping into multiple lines */
-			}
-		</style>
-		<script>
-			var dcremainsec = 300;
-			var dcintervals = null;
-
-			function startTimerDataCheck() {
-				clearInterval(dcintervals);
-				var timerDisplay = document.getElementById("timerDisplayDataCheck");
-				var btn = document.getElementById("startTimerButtonDataCheck");
-				dcremainsec = 300; // Initialize remaining seconds
-				updateDisplay(timerDisplay, dcremainsec);
-
-				// Fetch the audio element for alert sound (end.wav)
-				var alertSound = document.getElementById('alert-sound'); // End sound
-				
-				btn.hidden = true;
-
-				dcintervals = setInterval(function () {
-					if (dcremainsec > 0) {
-						dcremainsec--;
-
-						// **Immediately change timer color to red at 10 seconds**
-						if (dcremainsec === 10) {
-							timerDisplay.style.color = "red";  // Turn timer text red
-						}
-
-						// **Update the display**
-						updateDisplay(timerDisplay, dcremainsec);
-					} else {
-						clearInterval(dcintervals);
-
-						// **Play alert sound twice when time is up**
-						alertSound.play();  // First play
-						setTimeout(function () {
-							alertSound.currentTime = 0;  // Reset audio
-							alertSound.play();  // Play it again
-						}, 200);  // Slight delay of 300ms before playing again
-
-						timerDisplay.style.color = "red";  // Ensure the timer is red when time is up
-
-						dcremainsec = null;
-					}
-				}, 1000);
-			}
-		</script>
-	</div>
-
-	<div id="page9" class="page">
+	<div id="page-judges" class="page">
 		<h2>评委点评环节</h2>
 		<div id="judges-list">
 			<h5>评委: <span id="judge1-display"></span>
@@ -721,11 +1014,9 @@
 		</div>
 	</div>
 
-	<div id="page10" class="page">
+	<div id="page-end" class="page">
 		<h3>比赛结束</h3>
 	</div>
-
-	<!-- Add the rest of your pages here -->
 
 	<!-- 页面导航按钮 -->
 	<div class="nav-buttons">
@@ -737,79 +1028,590 @@
 </body>
 
 <script>
+	// ==================== 全局状态 ====================
 	var currentPage = 0;
-	var totalPages = 10; // Adjusted to the number of pages
-	var debateData = {}; // Global variable to hold data
-	var intervals = {};  // To store timer intervals for each page
-	var remainingSeconds = {};  // To store remaining time for each timer
-	var isPaused = {};  // To track paused state of timers
+	var pages = [];          // 页面描述: {id, kind, idx}
+	var debateData = {};     // 队伍/评委/持方等信息
+	var stages = [];         // 环节配置
+	var stageState = {};     // 每个环节的计时状态
+	var STORAGE_KEY = 'diyTimerStagesV1';
+	var PRESET_KEY = 'diyTimerPresetsV1';
+	var presets = [];        // 已保存的流程预设
 
+	// 默认环节（与原版一致：立论 3:30 / 自由时间 11:00 / 自由辩论 4:00 / 总结陈词 3:30 / 数据检验 5:00）
+	var defaultStages = [
+		{ name: '立论', time: '3:30', seconds: 210, type: 'dual', startSide: 'aff' },
+		{ name: '自由时间', time: '11:00', seconds: 660, type: 'dual', startSide: 'aff' },
+		// { name: '战术暂停', time: '5:00', seconds: 300, type: 'single' },
+		{ name: '自由辩论', time: '4:00', seconds: 240, type: 'dual', startSide: 'aff' },
+		{ name: '总结陈词', time: '3:30', seconds: 210, type: 'dual', startSide: 'aff' },
+		{ name: '数据检验', time: '5:00', seconds: 300, type: 'single' }
+	];
+
+	// ==================== 工具函数 ====================
+	function fmt(seconds) {
+		var m = Math.floor(seconds / 60);
+		var s = seconds % 60;
+		return m + ':' + (s < 10 ? '0' + s : s);
+	}
+
+	// 支持 "m:ss" 或纯秒数
+	function parseTime(str) {
+		str = String(str == null ? '' : str).trim();
+		if (/^\d+$/.test(str)) return parseInt(str, 10);
+		var m = str.match(/^(\d{1,3}):([0-5]?\d)$/);
+		if (m) return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+		return null;
+	}
+
+	function escapeHtml(str) {
+		return String(str == null ? '' : str)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
+	}
+
+	function playAlert() {
+		var s = document.getElementById('alert-sound');
+		if (s && s.play) {
+			try { s.currentTime = 0; s.play(); } catch (e) {}
+		}
+	}
+
+	// 时间到时提示音响两遍
+	function playEndSound() {
+		playAlert();
+		setTimeout(playAlert, 200);
+	}
+
+	function cloneStages(src) {
+		return src.map(function (s) {
+			return { name: s.name, time: s.time, seconds: s.seconds, type: s.type, startSide: s.startSide || 'aff' };
+		});
+	}
+
+	function normalizeStage(s) {
+		var seconds = parseInt(s.seconds, 10);
+		if (!seconds || seconds <= 0) seconds = parseTime(s.time) || 180;
+		return {
+			name: String(s.name || ''),
+			time: fmt(seconds),
+			seconds: seconds,
+			type: s.type === 'single' ? 'single' : 'dual',
+			startSide: s.startSide === 'neg' ? 'neg' : 'aff'
+		};
+	}
+
+	function loadStages() {
+		try {
+			var raw = localStorage.getItem(STORAGE_KEY);
+			if (raw) {
+				var arr = JSON.parse(raw);
+				if (Array.isArray(arr)) return arr.map(normalizeStage);
+			}
+		} catch (e) {}
+		return null;
+	}
+
+	function saveStages() {
+		try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stages)); } catch (e) {}
+	}
+
+	// ==================== 流程预设（存储 / 加载 / 导入导出） ====================
+	function loadPresets() {
+		try {
+			var raw = localStorage.getItem(PRESET_KEY);
+			if (raw) {
+				var arr = JSON.parse(raw);
+				if (Array.isArray(arr)) {
+					return arr.filter(function (p) {
+						return p && Array.isArray(p.stages) && p.stages.length > 0;
+					}).map(function (p) {
+						return { name: String(p.name || '未命名预设'), stages: p.stages.map(normalizeStage) };
+					});
+				}
+			}
+		} catch (e) {}
+		return [];
+	}
+
+	function persistPresets() {
+		try { localStorage.setItem(PRESET_KEY, JSON.stringify(presets)); } catch (e) {}
+	}
+
+	function renderPresetSelect() {
+		var sel = document.getElementById('preset-select');
+		if (!sel) return;
+		var html = '';
+		if (presets.length === 0) {
+			html = '<option value="">（暂无预设）</option>';
+		} else {
+			presets.forEach(function (p, i) {
+				html += '<option value="' + i + '">' + escapeHtml(p.name) + '（' + p.stages.length + ' 个环节）</option>';
+			});
+		}
+		sel.innerHTML = html;
+	}
+
+	function selectedPresetIndex() {
+		var sel = document.getElementById('preset-select');
+		var idx = parseInt(sel && sel.value, 10);
+		return (!isNaN(idx) && presets[idx]) ? idx : -1;
+	}
+
+	// 把当前环节配置存为预设，同名覆盖
+	function savePreset() {
+		if (stages.length === 0) {
+			alert('当前没有环节，请先在「环节设置」中添加环节。');
+			return;
+		}
+		if (!validateStages()) return;
+		renderStageList(); // 时长可能刚被规范化，刷新列表显示
+
+		var nameInput = document.getElementById('preset-name');
+		var name = (nameInput.value || '').trim() || ('预设 ' + (presets.length + 1));
+		var existing = -1;
+		presets.forEach(function (p, i) { if (p.name === name) existing = i; });
+		if (existing >= 0 && !confirm('已存在同名预设「' + name + '」，是否覆盖？')) return;
+
+		var preset = { name: name, stages: cloneStages(stages), savedAt: Date.now() };
+		if (existing >= 0) presets[existing] = preset;
+		else presets.push(preset);
+		persistPresets();
+		renderPresetSelect();
+		document.getElementById('preset-select').value = String(existing >= 0 ? existing : presets.length - 1);
+		nameInput.value = '';
+	}
+
+	// 把选中的预设载入环节列表
+	function applyPreset() {
+		var idx = selectedPresetIndex();
+		if (idx < 0) {
+			alert('请先选择一个预设。');
+			return;
+		}
+		stages = cloneStages(presets[idx].stages);
+		saveStages();
+		renderStageList();
+	}
+
+	function deletePreset() {
+		var idx = selectedPresetIndex();
+		if (idx < 0) {
+			alert('请先选择一个预设。');
+			return;
+		}
+		if (!confirm('确定删除预设「' + presets[idx].name + '」？')) return;
+		presets.splice(idx, 1);
+		persistPresets();
+		renderPresetSelect();
+	}
+
+	// 导出全部预设为 JSON 文件（下载到本机）
+	function exportPresets() {
+		if (presets.length === 0) {
+			alert('还没有保存任何预设。');
+			return;
+		}
+		var payload = {
+			app: 'diy-debate-timer',
+			kind: 'timer-presets',
+			version: 1,
+			exportedAt: new Date().toISOString(),
+			presets: presets
+		};
+		var blob = new Blob([JSON.stringify(payload, null, '\t')], { type: 'application/json' });
+		var a = document.createElement('a');
+		a.href = URL.createObjectURL(blob);
+		a.download = 'timer-presets.json';
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+	}
+
+	// 从上传的 JSON 文件导入预设，同名覆盖；
+	// 兼容三种格式：导出文件 {presets:[...]}、预设数组 [...]、单个预设 {stages:[...]}
+	function importPresets(data) {
+		var list = [];
+		if (Array.isArray(data)) list = data;
+		else if (data && Array.isArray(data.presets)) list = data.presets;
+		else if (data && Array.isArray(data.stages)) list = [data];
+		if (list.length === 0) {
+			alert('文件中没有可识别的预设。');
+			return;
+		}
+		var added = 0;
+		var replaced = 0;
+		list.forEach(function (item) {
+			if (!item || !Array.isArray(item.stages) || item.stages.length === 0) return;
+			var preset = {
+				name: String(item.name || '').trim() || ('导入预设 ' + (presets.length + 1)),
+				stages: item.stages.map(normalizeStage),
+				savedAt: Date.now()
+			};
+			var existing = -1;
+			presets.forEach(function (q, i) { if (q.name === preset.name) existing = i; });
+			if (existing >= 0) { presets[existing] = preset; replaced++; }
+			else { presets.push(preset); added++; }
+		});
+		if (added + replaced === 0) {
+			alert('文件中没有可用的预设。');
+			return;
+		}
+		persistPresets();
+		renderPresetSelect();
+		alert('导入完成：新增 ' + added + ' 个预设，覆盖 ' + replaced + ' 个同名预设。');
+	}
+
+	document.getElementById('preset-file').addEventListener('change', function (e) {
+		var file = e.target.files && e.target.files[0];
+		if (!file) return;
+		var reader = new FileReader();
+		reader.onload = function () {
+			try {
+				importPresets(JSON.parse(reader.result));
+			} catch (err) {
+				alert('文件解析失败，请选择有效的预设 JSON 文件。');
+			}
+			e.target.value = ''; // 允许再次上传同一个文件
+		};
+		reader.readAsText(file);
+	});
+
+	// ==================== 配置页渲染（DIY环节） ====================
+	function renderStageList() {
+		var list = document.getElementById('stage-list');
+		var html = '';
+		stages.forEach(function (s, i) {
+			var dualOpts = s.type === 'single'
+				? '<option value="dual">双方计时</option><option value="single" selected>单方计时</option>'
+				: '<option value="dual" selected>双方计时</option><option value="single">单方计时</option>';
+			var startOpts = s.startSide === 'neg'
+				? '<option value="aff">先正方</option><option value="neg" selected>先反方</option>'
+				: '<option value="aff" selected>先正方</option><option value="neg">先反方</option>';
+			html += '<div class="stage-row" data-idx="' + i + '">';
+			html += '<span class="stage-order">' + (i + 1) + '</span>';
+			html += '<input type="text" class="stage-name" value="' + escapeHtml(s.name) + '" placeholder="环节名称" title="环节名称">';
+			html += '<input type="text" class="stage-time" value="' + escapeHtml(s.time) + '" placeholder="m:ss" title="时长，如 3:30">';
+			html += '<select class="stage-type" title="计时类型">' + dualOpts + '</select>';
+			html += '<select class="stage-start" title="初始发言方">' + startOpts + '</select>';
+			html += '<span class="stage-ops">';
+			html += '<button class="icon-btn" onclick="moveStage(' + i + ', -1)" title="上移"' + (i === 0 ? ' disabled' : '') + '>▲</button>';
+			html += '<button class="icon-btn" onclick="moveStage(' + i + ', 1)" title="下移"' + (i === stages.length - 1 ? ' disabled' : '') + '>▼</button>';
+			html += '<button class="icon-btn danger" onclick="removeStage(' + i + ')" title="删除该环节">✕</button>';
+			html += '</span>';
+			html += '</div>';
+		});
+		var countEl = document.getElementById('stage-count');
+		if (countEl) countEl.innerText = stages.length + ' 个环节';
+		if (stages.length === 0) {
+			html = '<p class="empty-hint">当前没有环节，点击「添加环节」或「恢复默认」开始。</p>';
+		}
+		list.innerHTML = html;
+	}
+
+	// 事件委托：编辑名称/时长时实时同步到 stages
+	document.getElementById('stage-list').addEventListener('input', function (e) {
+		var row = e.target.closest ? e.target.closest('.stage-row') : null;
+		if (!row) return;
+		var idx = parseInt(row.getAttribute('data-idx'), 10);
+		if (isNaN(idx) || !stages[idx]) return;
+		if (e.target.classList.contains('stage-name')) stages[idx].name = e.target.value;
+		if (e.target.classList.contains('stage-time')) stages[idx].time = e.target.value;
+	});
+
+	// 切换类型/初始发言方
+	document.getElementById('stage-list').addEventListener('change', function (e) {
+		var row = e.target.closest ? e.target.closest('.stage-row') : null;
+		if (!row) return;
+		var idx = parseInt(row.getAttribute('data-idx'), 10);
+		if (isNaN(idx) || !stages[idx]) return;
+		if (e.target.classList.contains('stage-type')) {
+			stages[idx].type = e.target.value;
+			renderStageList();
+		}
+		if (e.target.classList.contains('stage-start')) stages[idx].startSide = e.target.value;
+	});
+
+	function addStage() {
+		stages.push({ name: '新环节' + (stages.length + 1), time: '3:00', seconds: 180, type: 'dual', startSide: 'aff' });
+		renderStageList();
+	}
+
+	function removeStage(idx) {
+		stages.splice(idx, 1);
+		renderStageList();
+	}
+
+	function moveStage(idx, dir) {
+		var j = idx + dir;
+		if (j < 0 || j >= stages.length) return;
+		var tmp = stages[idx];
+		stages[idx] = stages[j];
+		stages[j] = tmp;
+		renderStageList();
+	}
+
+	function loadDefaultStages() {
+		stages = cloneStages(defaultStages);
+		renderStageList();
+	}
+
+	function clearStages() {
+		stages = [];
+		renderStageList();
+	}
+
+	// 校验并规范化每个环节的时长，格式错误时弹窗并返回 false
+	function validateStages() {
+		for (var i = 0; i < stages.length; i++) {
+			var secs = parseTime(stages[i].time);
+			if (secs === null || secs <= 0) {
+				alert('第 ' + (i + 1) + ' 个环节的时长格式不正确，请填写 m:ss 或秒数（如 3:30 或 210）。');
+				return false;
+			}
+			stages[i].seconds = secs;
+			stages[i].time = fmt(secs);
+		}
+		return true;
+	}
+
+	// ==================== 保存并构建页面 ====================
 	function saveData() {
-		// Save the input data
+		if (!validateStages()) return;
+
+		// 保存队伍信息
 		debateData.debateNumber = document.getElementById('debate-number').value;
 		debateData.teamAff = document.getElementById('team-aff').value;
 		debateData.teamNeg = document.getElementById('team-neg').value;
-
-		// Save the stances as well
 		debateData.teamAffStance = document.getElementById('stance-aff-input').value;
 		debateData.teamNegStance = document.getElementById('stance-neg-input').value;
-
 		debateData.judge1 = document.getElementById('judge1').value;
 		debateData.judge2 = document.getElementById('judge2').value;
 		debateData.judge3 = document.getElementById('judge3').value;
 
+		saveStages();
 
-		// Display the saved team names in the header
+		// 更新头部与持方
 		document.getElementById('team-aff-header').innerText = '正方 ' + debateData.teamAff;
-		document.getElementById('team-neg-header').innerText = '反方 ' + debateData.teamNeg;
-
-		// Display the saved stances in the stance section
-		document.getElementById('stance-aff').innerText = '    ' + debateData.teamAffStance;
-		document.getElementById('stance-neg').innerText = debateData.teamNegStance + '    ';
-
-		// Display the judges' names in the Judges' Commentary section
+		document.getElementById('team-neg-header').innerText = debateData.teamNeg + ' 反方';
+		document.getElementById('stance-aff').innerText = '持方 ' + debateData.teamAffStance;
+		document.getElementById('stance-neg').innerText = debateData.teamNegStance + ' 持方';
 		document.getElementById('judge1-display').innerText = debateData.judge1 || '';
 		document.getElementById('judge2-display').innerText = debateData.judge2 || '';
 		document.getElementById('judge3-display').innerText = debateData.judge3 || '';
 
-
-		// Move to the next page
+		buildPages();
 		updateDisplays();
 		nextPage();
 	}
 
+	// 按当前 stages 配置重建所有页面
+	function buildPages() {
+		stopAllTimers();
 
-	function showPage(page) {
-		try {
-			stopAllTimers()
-		} catch (e) {
-
-		}
-
-		var pages = document.querySelectorAll('.page');
-		pages.forEach(function (p) {
-			p.classList.remove('visible');  // Hide all pages
+		var holder = document.getElementById('dynamic-pages');
+		holder.innerHTML = '';
+		stages.forEach(function (s, i) {
+			holder.insertAdjacentHTML('beforeend', buildStagePageHTML(i));
 		});
-		document.getElementById('page' + page).classList.add('visible'); // Show the selected page
 
-		// Show the header on all pages
+		// 初始化每个环节的计时状态
+		stageState = {};
+		stages.forEach(function (s, i) {
+			stageState[i] = {
+				aff: s.seconds,
+				neg: s.seconds,
+				current: s.startSide || 'aff',
+				paused: true,
+				iv: null
+			};
+		});
+
+		// 页面顺序：配置页、标题页、介绍页、各环节页、评委点评、比赛结束
+		pages = [
+			{ id: 'page0', kind: 'config' },
+			{ id: 'page1', kind: 'title' },
+			{ id: 'page2', kind: 'intro' }
+		];
+		for (var i = 0; i < stages.length; i++) {
+			pages.push({ id: 'p-st-' + i, kind: 'stage', idx: i });
+		}
+		pages.push({ id: 'page-judges', kind: 'judges' });
+		pages.push({ id: 'page-end', kind: 'end' });
+
+		if (currentPage >= pages.length) currentPage = pages.length - 1;
+	}
+
+	function buildStagePageHTML(i) {
+		var s = stages[i];
+		var name = s.name || ('环节' + (i + 1));
+		var html = '<div id="p-st-' + i + '" class="page">';
+		html += '<h4>' + escapeHtml(name) + '</h4>';
+		if (s.type === 'dual') {
+			html += '<div class="stances2">';
+			html += '<div class="left-stance2">正方</div>';
+			html += '<div class="right-stance2">反方</div>';
+			html += '</div>';
+			html += '<div class="timer-display-left" id="disp-aff-' + i + '">' + fmt(s.seconds) + '</div>';
+			html += '<div class="timer-display-right" id="disp-neg-' + i + '">' + fmt(s.seconds) + '</div>';
+			html += '<div class="button-group">';
+			html += '<div class="side-title" id="sideTitle-' + i + '">发言方：' + (s.startSide === 'neg' ? '反方' : '正方') + '</div>';
+			html += '<div class="button-row">';
+			html += '<button id="startTimerButton-p-st-' + i + '" onclick="startStageTimer(' + i + ')">开始计时</button>';
+			html += '<button id="changeButton-p-st-' + i + '" onclick="changeStageSide(' + i + ')">切换</button>';
+			html += '<button id="pauseResumeButton-p-st-' + i + '" onclick="pauseResumeStageTimer(' + i + ')">暂停/恢复</button>';
+			html += '<button id="resetButton-p-st-' + i + '" onclick="resetStageTimer(' + i + ')">重置</button>';
+			html += '</div>';
+			html += '</div>';
+		} else {
+			html += '<div class="timer-display" id="disp-single-' + i + '">' + fmt(s.seconds) + '</div>';
+			html += '<div class="button-group">';
+			html += '<div class="button-row">';
+			html += '<button id="startTimerButton-p-st-' + i + '" onclick="startStageTimer(' + i + ')">开始计时</button>';
+			html += '<button id="pauseResumeButton-p-st-' + i + '" onclick="pauseResumeStageTimer(' + i + ')">暂停/恢复</button>';
+			html += '<button id="resetButton-p-st-' + i + '" onclick="resetStageTimer(' + i + ')">重置</button>';
+			html += '</div>';
+			html += '</div>';
+		}
+		html += '</div>';
+		return html;
+	}
+
+	// ==================== 通用计时引擎 ====================
+	function startStageTimer(i) {
+		var st = stageState[i];
+		if (!st || !st.paused) return;
+		st.paused = false;
+		clearInterval(st.iv);
+		st.iv = setInterval(function () { tickStage(i); }, 1000);
+		var btn = document.getElementById('pauseResumeButton-p-st-' + i);
+		if (btn) btn.innerText = '暂停';
+	}
+
+	function tickStage(i) {
+		var s = stages[i];
+		var st = stageState[i];
+		var side = s.type === 'single' ? 'aff' : st.current;
+		var el = getDispEl(i, side);
+		var remain = st[side];
+		if (remain > 0) {
+			remain--;
+			st[side] = remain;
+			el.innerText = fmt(remain);
+			if (remain === 30) playAlert();           // 剩30秒提醒一次
+			if (remain === 10) el.style.color = 'red'; // 剩10秒变红
+			if (remain === 0) {
+				clearInterval(st.iv);
+				st.iv = null;
+				st.paused = true;
+				el.innerText = '时间到!';
+				el.style.color = 'red';
+				playEndSound();
+				var btn = document.getElementById('pauseResumeButton-p-st-' + i);
+				if (btn) btn.innerText = '暂停/恢复';
+			}
+		}
+	}
+
+	function getDispEl(i, side) {
+		var s = stages[i];
+		return document.getElementById(s.type === 'single' ? 'disp-single-' + i : 'disp-' + side + '-' + i);
+	}
+
+	function pauseResumeStageTimer(i) {
+		var st = stageState[i];
+		if (!st) return;
+		if (st.paused) {
+			startStageTimer(i);
+		} else {
+			clearInterval(st.iv);
+			st.iv = null;
+			st.paused = true;
+			var btn = document.getElementById('pauseResumeButton-p-st-' + i);
+			if (btn) btn.innerText = '暂停/恢复';
+		}
+	}
+
+	function changeStageSide(i) {
+		var s = stages[i];
+		var st = stageState[i];
+		if (!st || s.type !== 'dual') return;
+		var wasRunning = !st.paused;
+		clearInterval(st.iv);
+		st.iv = null;
+		st.paused = true;
+		st.current = st.current === 'aff' ? 'neg' : 'aff';
+		var title = document.getElementById('sideTitle-' + i);
+		if (title) title.innerText = '发言方：' + (st.current === 'aff' ? '正方' : '反方');
+		if (wasRunning) startStageTimer(i);
+	}
+
+	function resetStageTimer(i) {
+		var s = stages[i];
+		var st = stageState[i];
+		if (!st) return;
+		clearInterval(st.iv);
+		st.iv = null;
+		st.aff = s.seconds;
+		st.neg = s.seconds;
+		st.current = s.startSide || 'aff';
+		st.paused = true;
+		if (s.type === 'dual') {
+			var affEl = document.getElementById('disp-aff-' + i);
+			var negEl = document.getElementById('disp-neg-' + i);
+			affEl.innerText = fmt(s.seconds);
+			affEl.style.color = '';
+			negEl.innerText = fmt(s.seconds);
+			negEl.style.color = '';
+			var title = document.getElementById('sideTitle-' + i);
+			if (title) title.innerText = '发言方：' + (st.current === 'aff' ? '正方' : '反方');
+		} else {
+			var el = document.getElementById('disp-single-' + i);
+			el.innerText = fmt(s.seconds);
+			el.style.color = '';
+		}
+		var btn = document.getElementById('pauseResumeButton-p-st-' + i);
+		if (btn) btn.innerText = '暂停/恢复';
+	}
+
+	function stopAllTimers() {
+		for (var key in stageState) {
+			var st = stageState[key];
+			if (st && st.iv) {
+				clearInterval(st.iv);
+				st.iv = null;
+				st.paused = true;
+			}
+		}
+	}
+
+	// ==================== 页面导航 ====================
+	function showPage(page) {
+		stopAllTimers();
+
+		document.querySelectorAll('.page').forEach(function (p) {
+			p.classList.remove('visible');
+		});
+		document.getElementById(pages[page].id).classList.add('visible');
+
 		document.querySelector('.header').style.display = 'flex';
 
-		// Toggle the nav buttons visibility
+		// 配置页不显示导航按钮
 		if (page === 0) {
-			document.querySelector('.nav-buttons').style.display = 'none'; // Hide nav buttons on page 0
+			document.querySelector('.nav-buttons').style.display = 'none';
 		} else {
-			document.querySelector('.nav-buttons').style.display = 'flex'; // Show nav buttons on other pages
+			document.querySelector('.nav-buttons').style.display = 'flex';
 		}
 
-		// If data has been saved, update the header team names and stances
-		if (debateData.teamAff && debateData.teamNeg) {
+		// 有队伍信息时更新头部与持方
+		if (debateData.teamAff || debateData.teamNeg) {
 			document.getElementById('team-aff-header').innerText = '正方 ' + debateData.teamAff;
 			document.getElementById('team-neg-header').innerText = debateData.teamNeg + ' 反方';
-
 			document.getElementById('stance-aff').innerText = '持方 ' + debateData.teamAffStance;
 			document.getElementById('stance-neg').innerText = debateData.teamNegStance + ' 持方';
-
 		}
 		if (debateData.judge1 || debateData.judge2 || debateData.judge3) {
 			document.getElementById('judge1-display').innerText = debateData.judge1 || '';
@@ -818,635 +1620,78 @@
 		}
 	}
 
-
-	function updateDisplays() {
-		document.getElementById('debate-number-display').innerText = debateData.debateNumber;
-
-	}
-
-
 	function nextPage() {
-		if (currentPage < totalPages) {
-			if (currentPage === 4) {
-				currentPage = 6
-			} else {
-				currentPage++;
-			}
+		if (currentPage < pages.length - 1) {
+			currentPage++;
 			showPage(currentPage);
 		}
 	}
 
 	function prevPage() {
 		if (currentPage > 0) {
-			if (currentPage === 6) {
-				currentPage = 4
-			} else {
-				currentPage--;
-			}
+			currentPage--;
 			showPage(currentPage);
 		}
 	}
 
-	// 键盘事件监听器，允许用快捷键控制功能
-	document.addEventListener("keydown", function (event) {
+	function updateDisplays() {
+		document.getElementById('debate-number-display').innerText = debateData.debateNumber;
+	}
+
+	// ==================== 键盘快捷键 ====================
+	document.addEventListener('keydown', function (event) {
+		// 输入框/下拉框中打字时不触发快捷键
+		var tag = (event.target && event.target.tagName) || '';
+		if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+
+		var info = pages[currentPage];
+		if (!info) return;
+		var pageId = info.id;
+
 		switch (event.key) {
-			case "p":  // Pause/Resume with "P" key
-				var pauseResumeButtonId = `pauseResumeButton${currentPage}`;
-				var pauseResumeButton = document.getElementById(pauseResumeButtonId);
-				if (pauseResumeButton) {
-					pauseResumeButton.click();  // Simulate click if button exists
-					document.body.focus();  // Ensure focus stays on the document
-				}
-				event.preventDefault();  // Prevent default action
-				break;
-			case "ArrowLeft":
-				prevPage();  // Go to the previous page
+			case 'p': // 暂停/恢复
+				var pauseBtn = document.getElementById('pauseResumeButton-' + pageId);
+				if (pauseBtn) { pauseBtn.click(); document.body.focus(); }
 				event.preventDefault();
-				document.body.focus();  // Ensure focus stays on the document
 				break;
-			case "ArrowRight":
-				nextPage();  // Go to the next page
+			case 'r': // 重置
+				var resetBtn = document.getElementById('resetButton-' + pageId);
+				if (resetBtn) { resetBtn.click(); document.body.focus(); }
 				event.preventDefault();
-				document.body.focus();  // Ensure focus stays on the document
 				break;
-			case "r":  // Reset with "R" key
-				var resetButtonId = `resetButton${currentPage}`;
-				var resetButton = document.getElementById(resetButtonId);
-				if (resetButton) {
-					resetButton.click();  // Simulate click if button exists
-					document.body.focus();  // Ensure focus stays on the document
-				}
-				event.preventDefault();  // Prevent default action
+			case 'Enter': // 开始计时
+				var startBtn = document.getElementById('startTimerButton-' + pageId);
+				if (startBtn) { startBtn.click(); document.body.focus(); }
+				event.preventDefault();
 				break;
-			case "Enter":  // Start timer with "T" key
-				var startButtonId = `startTimerButton${currentPage}`;
-				var startButton = document.getElementById(startButtonId);
-				if (startButton) {
-					startButton.click();  // Simulate click if button exists
-					document.body.focus();  // Ensure focus stays on the document
+			case 'c': // 切换发言方（仅双方环节）
+				if (info.kind === 'stage' && stages[info.idx] && stages[info.idx].type === 'dual') {
+					var changeBtn = document.getElementById('changeButton-' + pageId);
+					if (changeBtn) { changeBtn.click(); document.body.focus(); }
 				}
-				event.preventDefault();  // Prevent default action
+				event.preventDefault();
 				break;
-			case "c" :  // Change side with C key
-				let changeButton = null;
-				if (currentPage === 4) {
-					changeButton = document.getElementById("changeButton4");
-				} else if (currentPage === 6) {
-					changeButton = document.getElementById("changeButton6");
-				}
-
-				if (changeButton) {
-					changeButton.click();  // Simulate click if button exists
-					document.body.focus();  // Ensure focus stays on the document
-				}
-				event.preventDefault();  // Prevent default action
+			case 'ArrowLeft':
+				prevPage();
+				event.preventDefault();
+				document.body.focus();
 				break;
-
+			case 'ArrowRight':
+				nextPage();
+				event.preventDefault();
+				document.body.focus();
+				break;
 		}
 	});
 
-
-	function startTimer(id, seconds) {
-		var timerDisplay = document.getElementById("timerDisplay" + id);
-		remainingSeconds[id] = seconds; // Initialize remaining seconds
-		updateDisplay(timerDisplay, remainingSeconds[id]);
-
-		// Fetch the audio element for alert sound (end.wav)
-		var alertSound = document.getElementById('alert-sound'); // End sound
-
-		if (!intervals[id]) {
-			intervals[id] = setInterval(function () {
-				if (remainingSeconds[id] > 0) {
-					remainingSeconds[id]--;
-
-					// **Play alert sound when time reaches 30 seconds**
-					if (remainingSeconds[id] === 30) {
-						alertSound.play();  // Play the alert sound
-					}
-
-					// **Immediately change timer color to red at 10 seconds**
-					if (remainingSeconds[id] === 10) {
-						timerDisplay.style.color = "red";  // Turn timer text red
-					}
-
-					// **Update the display**
-					updateDisplay(timerDisplay, remainingSeconds[id]);
-				} else {
-					clearInterval(intervals[id]);
-
-					// **Play alert sound twice when time is up**
-					alertSound.play();  // First play
-					setTimeout(function () {
-						alertSound.currentTime = 0;  // Reset audio
-						alertSound.play();  // Play it again
-					}, 200);  // Slight delay of 300ms before playing again
-
-					timerDisplay.innerText = "时间到!";  // Time's up message
-					timerDisplay.style.color = "red";  // Ensure the timer is red when time is up
-
-					document.getElementById(`pauseResumeButton${currentPage + 1}`).innerText = "暂停";
-					intervals[id] = null;
-				}
-			}, 1000);
-		}
-	}
-
-
-	function pauseResumeTimer(id) {
-		var button = document.getElementById(`pauseResumeButton${currentPage + 1}`);
-		if (isPaused[id]) {
-			// 恢复计时
-			startTimer(id, remainingSeconds[id]);
-		} else {
-			// 暂停计时
-			clearInterval(intervals[id]);
-			intervals[id] = null;
-		}
-		isPaused[id] = !isPaused[id];  // 切换暂停状态
-	}
-
-	function resetTimer(id, defaultTime) {
-		var timerDisplay = document.getElementById("timerDisplay" + id);
-		clearInterval(intervals[id]);
-		intervals[id] = null;
-		remainingSeconds[id] = defaultTime;  // 重置剩余秒数
-		updateDisplay(timerDisplay, defaultTime);
-		document.getElementById(`pauseResumeButton${currentPage + 1}`).innerText = "暂停";
-		isPaused[id] = false;  // 重置为未暂停状态
-	}
-
-	function updateDisplay(timerDisplay, seconds) {
-		var mins = Math.floor(seconds / 60);
-		var secs = seconds % 60;
-		timerDisplay.innerText = `${mins}:${secs < 10 ? '0' + secs : secs}`;
-	}
-
-
-	// Display the first page initially
+	// ==================== 启动 ====================
+	var savedStages = loadStages();
+	stages = savedStages ? savedStages : cloneStages(defaultStages);
+	renderStageList();
+	presets = loadPresets();
+	renderPresetSelect();
+	buildPages();
 	showPage(currentPage);
-
-
-	// Variables for 正方/反方立论与质询 (Page 3)
-	let timerAffOne = 210;  // 正方 timer in seconds (3.5 minutes)
-	let timerNegOne = 210;  // 反方 timer in seconds (3.5 minutes)
-	let currentTimerOne = 'aff';
-	let intervalAffOne = null;
-	let intervalNegOne = null;
-	let isPausedOne = true;
-
-	// Function to start the timer for 正方/反方立论与质询
-	function startTimerone() {
-		var alertSound = document.getElementById('alert-sound'); // End sound for alert
-		if (isPausedOne) {
-			if (currentTimerOne === 'aff') {
-				if (intervalNegOne) clearInterval(intervalNegOne);
-				intervalAffOne = setInterval(function () {
-					if (timerAffOne > 0) {
-						timerAffOne--;
-						updateTimerDisplayOne('3-1', timerAffOne);
-						if (timerAffOne === 30) {
-							alertSound.play();
-						}
-						// Change color and message when time is up
-						if (timerAffOne === 10) {
-							document.getElementById('timerDisplay3-1').style.color = 'red';  // Turn timer red
-						}
-					} else {
-						clearInterval(intervalAffOne);
-
-						// Play alert sound twice when time is up
-						alertSound.play();  // First play
-						setTimeout(function () {
-							alertSound.currentTime = 0;  // Reset audio
-							alertSound.play();  // Play it again
-						}, 200);  // Slight delay before playing again
-
-						// Set the time's up message
-						document.getElementById('timerDisplay3-1').innerText = "时间到!";
-						document.getElementById('timerDisplay3-1').style.color = 'red'; // Ensure red color
-					}
-				}, 1000);
-			} else {
-				if (intervalAffOne) clearInterval(intervalAffOne);
-				intervalNegOne = setInterval(function () {
-					if (timerNegOne > 0) {
-						timerNegOne--;
-						updateTimerDisplayOne('3-2', timerNegOne);
-						if (timerNegOne === 30) {
-							alertSound.play();
-						}
-						// Change color and message when time is up
-						if (timerNegOne === 10) {
-							document.getElementById('timerDisplay3-2').style.color = 'red';  // Turn timer red
-						}
-					} else {
-						clearInterval(intervalNegOne);
-
-						// Play alert sound twice when time is up
-						alertSound.play();  // First play
-						setTimeout(function () {
-							alertSound.currentTime = 0;  // Reset audio
-							alertSound.play();  // Play it again
-						}, 200);  // Slight delay before playing again
-
-						// Set the time's up message
-						document.getElementById('timerDisplay3-2').innerText = "时间到!";
-						document.getElementById('timerDisplay3-2').style.color = 'red'; // Ensure red color
-					}
-				}, 1000);
-			}
-			isPausedOne = false;
-		}
-	}
-
-
-	function pauseResumeTimerone() {
-		if (!isPausedOne) {
-			clearInterval(intervalAffOne);
-			clearInterval(intervalNegOne);
-			isPausedOne = true;
-		} else {
-			startTimerone();
-		}
-	}
-
-	function changeSideone() {
-		pauseResumeTimerone();
-		currentTimerOne = currentTimerOne === 'aff' ? 'neg' : 'aff';
-		document.getElementById('sideTitle1').innerText = currentTimerOne === 'aff' ? '发言方：正方' : '发言方：反方';
-		pauseResumeTimerone();
-	}
-
-	function resetTimersone() {
-		clearInterval(intervalAffOne);
-		clearInterval(intervalNegOne);
-		timerAffOne = 210;
-		timerNegOne = 210;
-		updateTimerDisplayOne('3-1', timerAffOne);
-		updateTimerDisplayOne('3-2', timerNegOne);
-		isPausedOne = true;
-	}
-
-	function updateTimerDisplayOne(timerId, timeLeft) {
-		let minutes = Math.floor(timeLeft / 60);
-		let seconds = timeLeft % 60;
-		document.getElementById('timerDisplay' + timerId).innerText = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
-	}
-
-
-	// Variables for 正方/反方自由时间 (Page 4)
-	let timerAffTwo = 660;  // 正方 timer in seconds (11 minutes)
-	let timerNegTwo = 660;  // 反方 timer in seconds (11 minutes)
-	let currentTimerTwo = 'aff';
-	let intervalAffTwo = null;
-	let intervalNegTwo = null;
-	let isPausedTwo = true;
-
-	// Function to start the timer for 正方/反方自由时间
-	function startTimertwo() {
-		var alertSound = document.getElementById('alert-sound'); // End sound for alert
-		if (isPausedTwo) {
-			if (currentTimerTwo === 'aff') {
-				if (intervalNegTwo) clearInterval(intervalNegTwo);
-				intervalAffTwo = setInterval(function () {
-					if (timerAffTwo > 0) {
-						timerAffTwo--;
-						updateTimerDisplayTwo('4-1', timerAffTwo);
-						if (timerAffTwo === 30) {
-							alertSound.play();
-						}
-						// Change color and message when time is up
-						if (timerAffTwo === 10) {
-							document.getElementById('timerDisplay4-1').style.color = 'red';  // Turn timer red
-						}
-					} else {
-						clearInterval(intervalAffTwo);
-
-						// Play alert sound twice when time is up
-						alertSound.play();  // First play
-						setTimeout(function () {
-							alertSound.currentTime = 0;  // Reset audio
-							alertSound.play();  // Play it again
-						}, 200);  // Slight delay before playing again
-
-						// Set the time's up message
-						document.getElementById('timerDisplay4-1').innerText = "时间到!";
-						document.getElementById('timerDisplay4-1').style.color = 'red'; // Ensure red color
-					}
-				}, 1000);
-			} else {
-				if (intervalAffTwo) clearInterval(intervalAffTwo);
-				intervalNegTwo = setInterval(function () {
-					if (timerNegTwo > 0) {
-						timerNegTwo--;
-						updateTimerDisplayTwo('4-2', timerNegTwo);
-						if (timerNegTwo === 30) {
-							alertSound.play();
-						}
-						// Change color and message when time is up
-						if (timerNegTwo === 10) {
-							document.getElementById('timerDisplay4-2').style.color = 'red';  // Turn timer red
-						}
-					} else {
-						clearInterval(intervalNegTwo);
-
-						// Play alert sound twice when time is up
-						alertSound.play();  // First play
-						setTimeout(function () {
-							alertSound.currentTime = 0;  // Reset audio
-							alertSound.play();  // Play it again
-						}, 200);  // Slight delay before playing again
-
-						// Set the time's up message
-						document.getElementById('timerDisplay4-2').innerText = "时间到!";
-						document.getElementById('timerDisplay4-2').style.color = 'red'; // Ensure red color
-					}
-				}, 1000);
-			}
-			isPausedTwo = false;
-		}
-	}
-
-
-	function pauseResumeTimertwo() {
-		if (!isPausedTwo) {
-			clearInterval(intervalAffTwo);
-			clearInterval(intervalNegTwo);
-			isPausedTwo = true;
-		} else {
-			startTimertwo();
-		}
-	}
-
-	function changeSidetwo() {
-		pauseResumeTimertwo();
-		currentTimerTwo = currentTimerTwo === 'aff' ? 'neg' : 'aff';
-		document.getElementById('sideTitle2').innerText = currentTimerTwo === 'aff' ? '发言方：正方' : '发言方：反方';
-		pauseResumeTimertwo();
-	}
-
-	function resetTimerstwo() {
-		clearInterval(intervalAffTwo);
-		clearInterval(intervalNegTwo);
-		timerAffTwo = 660;
-		timerNegTwo = 660;
-		updateTimerDisplayTwo('4-1', timerAffTwo);
-		updateTimerDisplayTwo('4-2', timerNegTwo);
-		isPausedTwo = true;
-	}
-
-	function updateTimerDisplayTwo(timerId, timeLeft) {
-		let minutes = Math.floor(timeLeft / 60);
-		let seconds = timeLeft % 60;
-		document.getElementById('timerDisplay' + timerId).innerText = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
-	}
-
-
-	// Variables for 正方/反方自由辩论 (Page 6)
-	let timerAffZiyou = 240;  // 正方 timer in seconds (4 minutes)
-	let timerNegZiyou = 240;  // 反方 timer in seconds (4 minutes)
-	let currentTimerZiyou = 'aff';
-	let intervalAffZiyou = null;
-	let intervalNegZiyou = null;
-	let isPausedZiyou = true;
-
-	// Function to start the timer for 正方/反方自由时间
-	function startTimerZiyou() {
-		var alertSound = document.getElementById('alert-sound'); // End sound for alert
-		if (isPausedZiyou) {
-			if (currentTimerZiyou === 'aff') {
-				if (intervalNegZiyou) clearInterval(intervalNegZiyou);
-				intervalAffZiyou = setInterval(function () {
-					if (timerAffZiyou > 0) {
-						timerAffZiyou--;
-						updateTimerDisplayZiyou('6-1', timerAffZiyou);
-						if (timerAffZiyou === 30) {
-							alertSound.play();
-						}
-						// Change color and message when time is up
-						if (timerAffZiyou === 10) {
-							document.getElementById('timerDisplay6-1').style.color = 'red';  // Turn timer red
-						}
-					} else {
-						clearInterval(intervalAffZiyou);
-
-						// Play alert sound twice when time is up
-						alertSound.play();  // First play
-						setTimeout(function () {
-							alertSound.currentTime = 0;  // Reset audio
-							alertSound.play();  // Play it again
-						}, 200);  // Slight delay before playing again
-
-						// Set the time's up message
-						document.getElementById('timerDisplay6-1').innerText = "时间到!";
-						document.getElementById('timerDisplay6-1').style.color = 'red'; // Ensure red color
-					}
-				}, 1000);
-			} else {
-				if (intervalAffZiyou) clearInterval(intervalAffZiyou);
-				intervalNegZiyou = setInterval(function () {
-					if (timerNegZiyou > 0) {
-						timerNegZiyou--;
-						updateTimerDisplayZiyou('6-2', timerNegZiyou);
-						if (timerNegZiyou === 30) {
-							alertSound.play();
-						}
-						// Change color and message when time is up
-						if (timerNegZiyou === 10) {
-							document.getElementById('timerDisplay6-2').style.color = 'red';  // Turn timer red
-						}
-					} else {
-						clearInterval(intervalNegZiyou);
-
-						// Play alert sound twice when time is up
-						alertSound.play();  // First play
-						setTimeout(function () {
-							alertSound.currentTime = 0;  // Reset audio
-							alertSound.play();  // Play it again
-						}, 200);  // Slight delay before playing again
-
-						// Set the time's up message
-						document.getElementById('timerDisplay6-2').innerText = "时间到!";
-						document.getElementById('timerDisplay6-2').style.color = 'red'; // Ensure red color
-					}
-				}, 1000);
-			}
-			isPausedZiyou = false;
-		}
-	}
-
-
-	function pauseResumeTimerZiyou() {
-		if (!isPausedZiyou) {
-			clearInterval(intervalAffZiyou);
-			clearInterval(intervalNegZiyou);
-			isPausedZiyou = true;
-		} else {
-			startTimerZiyou();
-		}
-	}
-
-	function changeSideZiyou() {
-		pauseResumeTimerZiyou();
-		currentTimerZiyou = currentTimerZiyou === 'aff' ? 'neg' : 'aff';
-		document.getElementById('sideTitle3').innerText = currentTimerZiyou === 'aff' ? '发言方：正方' : '发言方：反方';
-		pauseResumeTimerZiyou();
-	}
-
-	function resetTimersZiyou() {
-		clearInterval(intervalAffZiyou);
-		clearInterval(intervalNegZiyou);
-		timerAffZiyou = 240;
-		timerNegZiyou = 240;
-		updateTimerDisplayZiyou('6-1', timerAffZiyou);
-		updateTimerDisplayZiyou('6-2', timerNegZiyou);
-		isPausedZiyou = true;
-	}
-
-	function updateTimerDisplayZiyou(timerId, timeLeft) {
-		let minutes = Math.floor(timeLeft / 60);
-		let seconds = timeLeft % 60;
-		document.getElementById('timerDisplay' + timerId).innerText = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
-	}
-
-
-	// Variables for 正方/反方总结陈词 (Page 3)
-	let timerAffLast = 210;  // 正方 timer in seconds (3.5 minutes)
-	let timerNegLast = 210;  // 反方 timer in seconds (3.5 minutes)
-	let currentTimerLast = 'aff';
-	let intervalAffLast = null;
-	let intervalNegLast = null;
-	let isPausedLast = true;
-
-	// Function to start the timer for 正方/反方立论与质询
-	function startTimerlast() {
-		var alertSound = document.getElementById('alert-sound'); // End sound for alert
-		if (isPausedLast) {
-			if (currentTimerLast === 'aff') {
-				if (intervalNegLast) clearInterval(intervalNegLast);
-				intervalAffLast = setInterval(function () {
-					if (timerAffLast > 0) {
-						timerAffLast--;
-						updateTimerDisplayLast('7-1', timerAffLast);
-						if (timerAffLast === 30) {
-							alertSound.play();
-						}
-						// Change color and message when time is up
-						if (timerAffLast === 10) {
-							document.getElementById('timerDisplay7-1').style.color = 'red';  // Turn timer red
-						}
-					} else {
-						clearInterval(intervalAffLast);
-
-						// Play alert sound twice when time is up
-						alertSound.play();  // First play
-						setTimeout(function () {
-							alertSound.currentTime = 0;  // Reset audio
-							alertSound.play();  // Play it again
-						}, 200);  // Slight delay before playing again
-
-						// Set the time's up message
-						document.getElementById('timerDisplay7-1').innerText = "时间到!";
-						document.getElementById('timerDisplay7-1').style.color = 'red'; // Ensure red color
-					}
-				}, 1000);
-			} else {
-				if (intervalAffLast) clearInterval(intervalAffLast);
-				intervalNegLast = setInterval(function () {
-					if (timerNegLast > 0) {
-						timerNegLast--;
-						updateTimerDisplayLast('7-2', timerNegLast);
-						if (timerNegLast === 30) {
-							alertSound.play();
-						}
-						// Change color and message when time is up
-						if (timerNegLast === 10) {
-							document.getElementById('timerDisplay7-2').style.color = 'red';  // Turn timer red
-						}
-					} else {
-						clearInterval(intervalNegLast);
-
-						// Play alert sound twice when time is up
-						alertSound.play();  // First play
-						setTimeout(function () {
-							alertSound.currentTime = 0;  // Reset audio
-							alertSound.play();  // Play it again
-						}, 200);  // Slight delay before playing again
-
-						// Set the time's up message
-						document.getElementById('timerDisplay7-2').innerText = "时间到!";
-						document.getElementById('timerDisplay7-2').style.color = 'red'; // Ensure red color
-					}
-				}, 1000);
-			}
-			isPausedLast = false;
-		}
-	}
-
-
-	function pauseResumeTimerlast() {
-		if (!isPausedLast) {
-			clearInterval(intervalAffLast);
-			clearInterval(intervalNegLast);
-			isPausedLast = true;
-		} else {
-			startTimerlast();
-		}
-	}
-
-	function changeSidelast() {
-		pauseResumeTimerlast();
-		currentTimerLast = currentTimerLast === 'aff' ? 'neg' : 'aff';
-		document.getElementById('sideTitle4').innerText = currentTimerLast === 'aff' ? '发言方：正方' : '发言方：反方';
-		pauseResumeTimerlast();
-	}
-
-	function resetTimerslast() {
-		clearInterval(intervalAffLast);
-		clearInterval(intervalNegLast);
-		timerAffLast = 210;
-		timerNegLast = 210;
-		updateTimerDisplayOne('7-1', timerAffLast);
-		updateTimerDisplayOne('7-2', timerNegLast);
-		isPausedLast = true;
-	}
-
-	function updateTimerDisplayLast(timerId, timeLeft) {
-		let minutes = Math.floor(timeLeft / 60);
-		let seconds = timeLeft % 60;
-		document.getElementById('timerDisplay' + timerId).innerText = `${minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
-	}
-
-	function stopAllTimers() {
-		// 1️⃣ 停止通用计时器
-		for (let key in intervals) {
-			if (intervals[key]) {
-				clearInterval(intervals[key]);
-				intervals[key] = null;
-			}
-		}
-
-		// 2️⃣ 停止立论
-		clearInterval(intervalAffOne);
-		clearInterval(intervalNegOne);
-		isPausedOne = true;
-
-		// 3️⃣ 停止自由时间
-		clearInterval(intervalAffTwo);
-		clearInterval(intervalNegTwo);
-		isPausedTwo = true;
-
-		// 4️⃣ 停止自由辩
-		clearInterval(intervalAffZiyou);
-		clearInterval(intervalNegZiyou);
-		isPausedZiyou = true;
-
-		// 5️⃣ 停止总结陈词
-		clearInterval(intervalAffLast);
-		clearInterval(intervalNegLast);
-		isPausedLast = true;
-	}
-
 
 </script>
 
