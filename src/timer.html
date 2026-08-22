@@ -876,7 +876,7 @@
 <audio id="alert-sound" src="/assets/end.wav" preload="auto"></audio>
 <div class="header">
 	<div class="left-column" id="team-aff-header"> 正方</div>
-	<div class="middle-column">渤海杯</div>
+	<div class="middle-column"><span id="debate-name-nav">XDomHatter的计时器</span></div>
 	<div class="right-column" id="team-neg-header"> 反方</div>
 </div>
 <div class="stances">
@@ -908,8 +908,8 @@
 				</div>
 				<div class="input-container">
 					<div class="input-box">
-						<label for="debate-number">辩论赛序号</label>
-						<input type="text" id="debate-number" placeholder="例如：A1">
+						<label for="debate-number">辩论赛名称</label>
+						<input type="text" id="debate-number" placeholder="例如：渤海杯SA-1">
 					</div>
 
 					<div class="input-box">
@@ -998,7 +998,7 @@
 	</div>
 
 	<div id="page1" class="page">
-		<h3>渤海杯辩论赛 <br> <span id="debate-number-display"></span></h3>
+		<h3><span id="debate-number-display"></span></h3>
 	</div>
 
 	<div id="page2" class="page">
@@ -1882,6 +1882,7 @@
 
 	function updateDisplays() {
 		document.getElementById('debate-number-display').innerText = debateData.debateNumber;
+		document.getElementById('debate-name-nav').innerText = debateData.debateNumber;
 	}
 
 	// ==================== 键盘快捷键 ====================
