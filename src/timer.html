@@ -3,7 +3,7 @@
 
 <head>
 	<meta charset="UTF-8">
-	<title>计时器（可DIY环节）</title>
+	<title>XDomHatter的计时器</title>
 	<style>
 		body, html {
 			height: 100%;
@@ -967,7 +967,12 @@
 					<button class="btn-secondary" onclick="document.getElementById('preset-file').click()">上传预设文件</button>
 					<input type="file" id="preset-file" accept=".json,application/json" style="display:none">
 				</div>
-				<p class="hint">预设只保存环节流程（名称 / 时长 / 类型 / 初始发言方），不保存队伍信息，同名预设会被覆盖。「导出全部预设」生成 JSON 文件，可在其他电脑的计时器里通过「上传预设文件」导入。</p>
+				<div class="preset-bar">
+					<button class="btn-secondary" onclick="exportPresetLink()">复制预设链接</button>
+					<input type="text" id="preset-code" placeholder="粘贴预设编码，或直接粘贴整个 ?preset= 链接" title="从编码导入预设流程">
+					<button class="btn-secondary" onclick="importPresetCodeInput()">从编码导入</button>
+				</div>
+				<p class="hint">预设只保存环节流程（名称 / 时长 / 类型 / 初始发言方），不保存队伍信息，同名预设会被覆盖。「导出全部预设」生成 JSON 文件，可在其他电脑的计时器里通过「上传预设文件」导入。「复制预设链接」会把当前流程编码为短链接（?preset=…），对方打开链接即自动导入；若链接未携带编码，则按本地预设正常加载。</p>
 			</div>
 
 			<div class="card">
@@ -1278,6 +1283,248 @@
 		};
 		reader.readAsText(file);
 	});
+
+	// ==================== 预设编码（短链接导入导出） ====================
+	// 编码格式：p1.<base64url(UTF-8)>，内部文本为：
+	//   <名称>|<秒数>|<类型0双方1单方>|<首发0正方1反方>;...
+	//   名称中的 \ | ; 使用反斜杠转义，因此不会破坏分段
+	var B64_URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+	function utf8Bytes(str) {
+		str = String(str == null ? '' : str);
+		var bytes = [];
+		for (var i = 0; i < str.length; i++) {
+			var c = str.charCodeAt(i);
+			if (c < 0x80) {
+				bytes.push(c);
+			} else if (c < 0x800) {
+				bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+			} else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length) {
+				var c2 = str.charCodeAt(i + 1);
+				if (c2 >= 0xdc00 && c2 <= 0xdfff) {
+					var cp = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
+					bytes.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+					i++;
+				} else {
+					bytes.push(0xef, 0xbf, 0xbd);
+				}
+			} else if (c >= 0xd800 && c <= 0xdfff) {
+				bytes.push(0xef, 0xbf, 0xbd);
+			} else {
+				bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+			}
+		}
+		return bytes;
+	}
+
+	function bytesToUtf8(bytes) {
+		var out = '';
+		for (var i = 0; i < bytes.length;) {
+			var b = bytes[i];
+			if (b < 0x80) {
+				out += String.fromCharCode(b);
+				i++;
+			} else if ((b & 0xe0) === 0xc0 && i + 1 < bytes.length) {
+				out += String.fromCharCode(((b & 0x1f) << 6) | (bytes[i + 1] & 0x3f));
+				i += 2;
+			} else if ((b & 0xf0) === 0xe0 && i + 2 < bytes.length) {
+				out += String.fromCharCode(((b & 0x0f) << 12) | ((bytes[i + 1] & 0x3f) << 6) | (bytes[i + 2] & 0x3f));
+				i += 3;
+			} else if ((b & 0xf8) === 0xf0 && i + 3 < bytes.length) {
+				var cp = ((b & 0x07) << 18) | ((bytes[i + 1] & 0x3f) << 12) | ((bytes[i + 2] & 0x3f) << 6) | (bytes[i + 3] & 0x3f);
+				cp -= 0x10000;
+				out += String.fromCharCode(0xd800 + (cp >> 10), 0xdc00 + (cp & 0x3ff));
+				i += 4;
+			} else {
+				out += '\ufffd';
+				i++;
+			}
+		}
+		return out;
+	}
+
+	function bytesToBase64Url(bytes) {
+		var out = '';
+		for (var i = 0; i < bytes.length; i += 3) {
+			var b0 = bytes[i];
+			var b1 = i + 1 < bytes.length ? bytes[i + 1] : -1;
+			var b2 = i + 2 < bytes.length ? bytes[i + 2] : -1;
+			out += B64_URL_ALPHABET.charAt(b0 >> 2);
+			out += B64_URL_ALPHABET.charAt(((b0 & 0x03) << 4) | (b1 < 0 ? 0 : b1 >> 4));
+			if (b1 >= 0) out += B64_URL_ALPHABET.charAt(((b1 & 0x0f) << 2) | (b2 < 0 ? 0 : b2 >> 6));
+			if (b2 >= 0) out += B64_URL_ALPHABET.charAt(b2 & 0x3f);
+		}
+		return out;
+	}
+
+	function base64UrlToBytes(s) {
+		var bytes = [];
+		var buf = 0;
+		var bits = 0;
+		for (var i = 0; i < s.length; i++) {
+			var v = B64_URL_ALPHABET.indexOf(s.charAt(i));
+			if (v < 0) continue;
+			buf = (buf << 6) | v;
+			bits += 6;
+			if (bits >= 8) {
+				bits -= 8;
+				bytes.push((buf >> bits) & 0xff);
+				buf &= bits ? ((1 << bits) - 1) : 0;
+			}
+		}
+		return bytes;
+	}
+
+	function splitEscaped(str, sep) {
+		var parts = [];
+		var cur = '';
+		for (var i = 0; i < str.length; i++) {
+			var ch = str.charAt(i);
+			if (ch === '\\' && i + 1 < str.length) {
+				cur += ch + str.charAt(i + 1); // 保留转义序列，供后续切分/反转义使用
+				i++;
+			} else if (ch === sep) {
+				parts.push(cur);
+				cur = '';
+			} else {
+				cur += ch;
+			}
+		}
+		parts.push(cur);
+		return parts;
+	}
+
+	// 还原 \ | ; 的转义
+	function unescapePresetField(str) {
+		return str.replace(/\\(.)/g, '$1');
+	}
+
+	// 把当前环节列表编码为短字符串
+	function encodePresetCode(stages) {
+		var parts = stages.map(function (s) {
+			var name = String(s.name == null ? '' : s.name)
+				.replace(/\\/g, '\\\\')
+				.replace(/\|/g, '\\|')
+				.replace(/;/g, '\\;');
+			return name + '|' + s.seconds + '|' + (s.type === 'single' ? 1 : 0) + '|' + (s.startSide === 'neg' ? 1 : 0);
+		});
+		return 'p1.' + bytesToBase64Url(utf8Bytes(parts.join(';')));
+	}
+
+	// 解码短字符串；无法识别时返回 null
+	function decodePresetCode(code) {
+		if (!code || code.indexOf('p1.') !== 0) return null;
+		var text;
+		try {
+			text = bytesToUtf8(base64UrlToBytes(code.slice(3)));
+		} catch (e) {
+			return null;
+		}
+		var list = [];
+		var rawStages = splitEscaped(text, ';');
+		for (var i = 0; i < rawStages.length; i++) {
+			var f = splitEscaped(rawStages[i], '|');
+			if (f.length !== 4) return null;
+			var seconds = parseInt(f[1], 10);
+			if (isNaN(seconds) || seconds <= 0 || seconds > 59999) return null;
+			if (f[2] !== '0' && f[2] !== '1') return null;
+			if (f[3] !== '0' && f[3] !== '1') return null;
+			list.push({
+				name: unescapePresetField(f[0]),
+				time: fmt(seconds),
+				seconds: seconds,
+				type: f[2] === '1' ? 'single' : 'dual',
+				startSide: f[3] === '1' ? 'neg' : 'aff'
+			});
+		}
+		return list.length > 0 ? list : null;
+	}
+
+	// 从当前 URL 的 ?preset= 参数读取编码
+	function getPresetCodeFromUrl() {
+		var m = (window.location.search || '').match(/[?&]preset=([^&]*)/);
+		if (!m) return null;
+		try { return decodeURIComponent(m[1]); } catch (e) { return null; }
+	}
+
+	// 兼容直接粘贴整个链接：从 ?preset= 中提取编码
+	function extractPresetCode(text) {
+		text = String(text == null ? '' : text).trim();
+		var m = text.match(/[?&]preset=([^&#]*)/);
+		if (m) {
+			try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
+		}
+		return text;
+	}
+
+	// 复制文本到剪贴板；不支持时退回兼容方式，done(ok) 返回是否成功
+	function copyText(text, done) {
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(text).then(function () {
+				done(true);
+			}, function () {
+				done(legacyCopy(text));
+			});
+		} else {
+			done(legacyCopy(text));
+		}
+	}
+
+	function legacyCopy(text) {
+		var ok = false;
+		var ta = document.createElement('textarea');
+		ta.value = text;
+		ta.style.position = 'fixed';
+		ta.style.left = '-9999px';
+		document.body.appendChild(ta);
+		ta.select();
+		try { ok = document.execCommand('copy'); } catch (e) {}
+		document.body.removeChild(ta);
+		return ok;
+	}
+
+	// 把当前环节列表编码为短链接并复制
+	function exportPresetLink() {
+		if (stages.length === 0) {
+			alert('当前没有环节，请先在「环节设置」中添加环节。');
+			return;
+		}
+		if (!validateStages()) return;
+		renderStageList(); // 时长可能刚被规范化，刷新列表显示
+
+		var code = encodePresetCode(stages);
+		var url = window.location.href.replace(/[?#].*$/, '') + '?preset=' + code;
+		copyText(url, function (ok) {
+			if (ok) {
+				alert('已复制预设链接，发送给他人打开即可自动导入当前流程。');
+			} else {
+				prompt('复制失败，请手动复制以下链接（发送给他人打开即可自动导入流程）：', url);
+			}
+		});
+	}
+
+	// 把编码对应的环节列表应用到当前流程
+	function applyPresetCode(list) {
+		stages = list;
+		saveStages();
+		renderStageList();
+	}
+
+	// 从输入框中的编码导入
+	function importPresetCodeInput() {
+		var code = extractPresetCode(document.getElementById('preset-code').value);
+		if (!code) {
+			alert('请先粘贴预设编码（短链接中 ?preset= 后面的部分）。');
+			return;
+		}
+		var list = decodePresetCode(code);
+		if (!list) {
+			alert('预设编码无效，请检查后重试。');
+			return;
+		}
+		applyPresetCode(list);
+		alert('已导入 ' + list.length + ' 个环节的预设流程。');
+	}
 
 	// ==================== 配置页渲染（DIY环节） ====================
 	function renderStageList() {
@@ -1684,13 +1931,24 @@
 	});
 
 	// ==================== 启动 ====================
-	var savedStages = loadStages();
-	stages = savedStages ? savedStages : cloneStages(defaultStages);
+	// 优先使用 URL 中的预设编码（?preset=...）导入流程；
+	// 若 URL 未携带编码或编码无法识别，则保持原有逻辑（本地存储 → 默认流程）
+	var urlPresetCode = getPresetCodeFromUrl();
+	var urlStages = urlPresetCode ? decodePresetCode(urlPresetCode) : null;
+	if (urlStages) {
+		stages = urlStages;
+		saveStages();
+	} else {
+		if (urlPresetCode) console.warn('URL 中的预设编码无法识别，已使用本地预设。');
+		var savedStages = loadStages();
+		stages = savedStages ? savedStages : cloneStages(defaultStages);
+	}
 	renderStageList();
 	presets = loadPresets();
 	renderPresetSelect();
 	buildPages();
 	showPage(currentPage);
+	if (urlStages) alert('已从链接导入预设流程（' + urlStages.length + ' 个环节），可在环节设置中查看。');
 
 </script>
 
