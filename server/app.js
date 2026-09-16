@@ -45,6 +45,11 @@ function baseOptions (extra) {
 	)
 }
 
+/* ---------------- Timer -----------------*/
+app.get('/timer', (req, res) => {
+	res.sendFile(path.join(DIST, 'timer.html'));
+})
+
 /* ---------------- 博客前台 ---------------- */
 
 app.get(['/blog', '/blog/'], function (req, res) {
@@ -239,6 +244,7 @@ if (require.main === module) {
 	app.listen(PORT, function () {
 		console.log('[blog] 监听 http://localhost:' + PORT)
 		console.log('[blog] 博客 /blog    后台 /admin')
+		console.log('[timer] 计时器 /timer')
 		console.log('[blog] 文章目录 ' + store.POSTS_DIR)
 	})
 }
