@@ -17,7 +17,7 @@ const path = require('path');
 const config = require('./config.json')
 
 gulp.task('clean', function () {
-	return del(['./dist/css/', './dist/js/'])
+	return del(['./dist/css/', './dist/js/', './dist/blog/'])
 })
 
 gulp.task('css', function () {
@@ -68,7 +68,15 @@ gulp.task('assets', function () {
 		.pipe(gulp.dest('./dist/assets'));
 })
 
-gulp.task('build', gulp.series('clean', 'assets', 'pug', 'css', 'js', 'html', 'timer'))
+gulp.task('blog', function () {
+	return Promise.resolve()
+		.then(require('./scripts/build-blog.js'))
+		.then(function () {
+			return gulp.src('./dist/blog/**/*.html').pipe(connect.reload())
+		})
+})
+
+gulp.task('build', gulp.series('clean', 'assets', 'pug', 'css', 'js', 'html', 'timer', 'blog'))
 gulp.task('default', gulp.series('build'))
 
 gulp.task('watch', function () {
@@ -76,6 +84,7 @@ gulp.task('watch', function () {
 	gulp.watch('./src/index.pug', gulp.parallel('pug'))
 	gulp.watch('./src/css/**/*.scss', gulp.parallel(['css']))
 	gulp.watch('./src/js/*.js', gulp.parallel(['js']))
+	gulp.watch(['./src/blog/**/*'], gulp.series('blog'))
 	connect.server({
 		root: 'dist',
 		livereload: true,
@@ -103,9 +112,13 @@ gulp.task('serve', function () {
         res.sendFile(path.join(distPath, 'index.html'));
     });
 		
-		app.get('/timer', (req, res) => {
-			res.sendFile(path.join(distPath, 'timer.html'));
-		})
+	app.get('/timer', (req, res) => {
+		res.sendFile(path.join(distPath, 'timer.html'));
+	})
+
+	app.get('/blog', (req, res) => {
+		res.sendFile(path.join(distPath, 'blog', 'index.html'));
+	})
 
     app.listen(80, () => console.log("Server listening on :80"));
 });

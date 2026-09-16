@@ -1,0 +1,49 @@
+extends layout
+
+block content
+	div.blog
+		header.blog-header
+			a.blog-back(href=`${root}${suffix}`) &larr; Home
+			h1.blog-title= blogTitle
+			if blogDesc
+				p.blog-desc= blogDesc
+
+			if tag
+				h2.blog-tag-heading
+					span 标签：#{tag}
+					a.blog-clear(href=`${root}blog/${suffix}`) 查看全部
+			else
+				div.blog-tools
+					input#blog-search.blog-search(type="search" placeholder="搜索标题、摘要或标签…" autocomplete="off" aria-label="搜索文章")
+					if tags.length
+						ul.blog-tags
+							each item in tags
+								li
+									button.blog-tag(type="button" data-tag=item.name)
+										| #{item.name}
+										span.blog-tag-count #{item.count}
+
+			p#blog-count.blog-count
+
+		ul#blog-list.blog-list
+			each item in posts
+				li.blog-item(data-tags=item.tags.join(',') data-title=item.title data-summary=item.summary)
+					a.blog-item-link(href=`${root}blog/posts/${item.slug}/${suffix}`)
+						span.blog-item-date= item.date
+						h2.blog-item-title= item.title
+					if item.summary
+						p.blog-item-summary= item.summary
+					if item.tags.length
+						ul.blog-item-tags
+							each name in item.tags
+								li= name
+
+		p#blog-empty.blog-empty 没有匹配的文章
+
+		footer.blog-footer
+			a.blog-rss(href=`${root}blog/feed.xml`) RSS
+
+	if jsInline
+		script!= jsInline
+	else
+		script(src=`${root}js/blog.js`)

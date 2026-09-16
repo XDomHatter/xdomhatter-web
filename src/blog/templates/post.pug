@@ -1,0 +1,40 @@
+extends layout
+
+block content
+	div.blog-progress
+		span#blog-progress-bar
+
+	div.blog.blog-single
+		header.blog-header
+			a.blog-back(href=`${root}blog/${suffix}`) &larr; Blog
+
+		article.blog-article
+			h1.blog-post-title= post.title
+			div.blog-post-info
+				time.blog-post-date= post.date
+				span.blog-post-words #{post.readingTime} 分钟阅读
+				if post.tags.length
+					ul.blog-item-tags
+						each item in post.tagObjs
+							li
+								a(href=`${root}blog/tags/${item.slug}/${suffix}`)= item.name
+
+			if post.toc.length
+				nav.blog-toc
+					h2.blog-toc-title 目录
+					ul
+						each item in post.toc
+							li(class=`blog-toc-level-${item.level}`)
+								a(href=`#${item.id}`)= item.text
+
+			div.blog-content !{post.content}
+
+		footer.blog-footer
+			a.blog-back(href=`${root}blog/${suffix}`) &larr; 返回列表
+
+	button#blog-top.blog-top(type="button" aria-label="回到顶部") &uarr;
+
+	if jsInline
+		script!= jsInline
+	else
+		script(src=`${root}js/blog.js`)

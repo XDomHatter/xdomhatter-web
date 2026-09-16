@@ -39,7 +39,17 @@
 				"href": "https://github.com/XDomHatter",
 				"icon": "github",
 				"text": "Github"
+			},
+			"fifth": {
+				"href": "blog/",
+				"icon": "blog",
+				"text": "Blog"
 			}
 		}
+	},
+	"blog": {
+		"title": "Blog",
+		"description": "Code & Input & Output",
+		"url": "http://xdomhatter.cn"
 	}
 }

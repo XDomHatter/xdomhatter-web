@@ -1,0 +1,27 @@
+doctype html
+html(lang="zh-CN")
+	head
+		meta(charset="utf-8")
+		meta(name="viewport" content="width=device-width,initial-scale=1,maximum-scale=2")
+		meta(name="renderer" content="webkit")
+		meta(name="theme-color" content="#060606")
+
+		title= title
+		meta(name="description" content=description)
+
+		link(rel="icon" href=`${root}assets/favicon.ico` type="image/x-icon")
+		link(rel="shortcut icon" href=`${root}assets/favicon.ico` type="image/x-icon")
+		if cssInline
+			style!= cssInline
+		else
+			link(rel="stylesheet" href=`${root}css/blog.css`)
+
+		if feed
+			link(rel="alternate" type="application/rss+xml" title=blogTitle href=`${root}blog/feed.xml`)
+
+		if math
+			link(rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css")
+			link(rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/atom-one-dark.min.css")
+
+	body.blog-body
+		block content

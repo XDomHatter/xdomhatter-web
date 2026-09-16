@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width,initial-scale=1">
+	<title>Blog 后台</title>
+	<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+	<style>
+		:root {
+			--bg: #060606;
+			--panel: #0d0e10;
+			--border: rgba(255, 255, 255, .1);
+			--text: #93979e;
+			--strong: #e6e6e6;
+			--dim: #6b6f76;
+			--accent: #7f77dd;
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			padding: 28px 20px 60px;
+			background: var(--bg);
+			color: var(--text);
+			font: 14px/1.7 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft Yahei', sans-serif;
+		}
+		h1 { margin: 0; color: var(--strong); font-size: 20px; font-weight: 300; letter-spacing: 2px; }
+		h2 { margin: 0 0 10px; color: var(--strong); font-size: 14px; font-weight: 400; }
+		a { color: var(--text); }
+		button, input, textarea {
+			font-family: inherit; font-size: 13px; color: var(--strong);
+			background: var(--panel); border: 1px solid var(--border);
+			border-radius: 8px; padding: 8px 10px; outline: none;
+			transition: border-color .2s, box-shadow .2s;
+		}
+		input:focus, textarea:focus { border-color: rgba(127,119,221,.7); box-shadow: 0 0 0 3px rgba(127,119,221,.12); }
+		button { cursor: pointer; color: var(--strong); }
+		button:hover { border-color: rgba(255,255,255,.3); }
+		button.primary { background: rgba(127,119,221,.28); border-color: var(--accent); }
+		button.danger:hover { border-color: #e24b4a; color: #f09595; }
+		button:disabled { opacity: .5; cursor: not-allowed; }
+		.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 18px 0 22px; }
+		.bar .grow { flex: 1; min-width: 220px; }
+		.cols { display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
+		@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+		.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+		.list { list-style: none; margin: 0; padding: 0; max-height: 70vh; overflow: auto; }
+		.list li { padding: 10px; border-radius: 8px; cursor: pointer; transition: background .2s; }
+		.list li:hover { background: rgba(255,255,255,.04); }
+		.list li.active { background: rgba(127,119,221,.18); }
+		.list .t { color: var(--strong); font-size: 13px; }
+		.list .m { color: var(--dim); font-size: 11px; }
+		.badge { display: inline-block; margin-left: 6px; padding: 0 6px; border: 1px solid var(--border); border-radius: 999px; font-size: 10px; color: var(--dim); }
+		.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+		@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+		label { display: block; margin-bottom: 4px; color: var(--dim); font-size: 12px; }
+		.field { margin-bottom: 12px; }
+		.field input, .field textarea { width: 100%; }
+		textarea#body { min-height: 320px; font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 12.5px; line-height: 1.6; }
+		.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+		#status { margin-top: 12px; font-size: 12px; min-height: 18px; }
+		#status.err { color: #f09595; }
+		#status.ok { color: #97c459; }
+		#preview { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); word-wrap: break-word; }
+		#preview h2 { color: var(--strong); }
+		#preview pre { background: #000; padding: 12px; overflow: auto; border-radius: 8px; border: 1px solid var(--border); }
+		#preview code { font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 12.5px; }
+		#preview .katex { color: var(--strong); }
+		.empty { color: var(--dim); font-size: 12px; }
+	</style>
+</head>
+<body>
+	<h1>Blog 后台</h1>
+
+	<div class="bar">
+		<input id="token" class="grow" type="password" placeholder="管理令牌 BLOG_ADMIN_TOKEN" autocomplete="off">
+		<button id="connect">连接</button>
+		<button id="newPost">新建文章</button>
+		<a href="/blog/" target="_blank" rel="noopener">查看博客 ↗</a>
+	</div>
+
+	<div class="cols">
+		<div class="panel">
+			<h2>文章</h2>
+			<ul id="list" class="list"><li class="empty">未连接</li></ul>
+		</div>
+
+		<div class="panel">
+			<h2 id="editorTitle">未选择文章</h2>
+			<div class="grid">
+				<div class="field">
+					<label for="title">标题</label>
+					<input id="title" placeholder="文章标题">
+				</div>
+				<div class="field">
+					<label for="slug">slug（URL 片段）</label>
+					<input id="slug" placeholder="留空则按标题生成">
+				</div>
+				<div class="field">
+					<label for="date">日期</label>
+					<input id="date" type="date">
+				</div>
+				<div class="field">
+					<label for="tags">标签（逗号分隔）</label>
+					<input id="tags" placeholder="math, machine-learning">
+				</div>
+			</div>
+			<div class="field">
+				<label for="summary">摘要（留空自动截取）</label>
+				<input id="summary" placeholder="一句话摘要">
+			</div>
+			<div class="field">
+				<label for="body">正文（Markdown，支持 $LaTeX$）</label>
+				<textarea id="body" spellcheck="false"></textarea>
+			</div>
+
+			<div class="row">
+				<button id="save" class="primary">保存</button>
+				<button id="delete" class="danger">删除</button>
+				<label style="margin:0;display:flex;align-items:center;gap:6px">
+					<input id="draft" type="checkbox" style="width:auto"> 草稿
+				</label>
+				<span id="mode" class="empty"></span>
+			</div>
+			<div id="status"></div>
+
+			<div id="preview"></div>
+		</div>
+	</div>
+
+	<script>
+	(function () {
+		var TOKEN_KEY = 'blog_admin_token';
+		var $ = function (id) { return document.getElementById(id); };
+		var token = localStorage.getItem(TOKEN_KEY) || '';
+		var current = null;
+		var previewTimer = null;
+
+		$('token').value = token;
+
+		function setStatus (msg, kind) {
+			var el = $('status');
+			el.textContent = msg || '';
+			el.className = kind || '';
+		}
+
+		function api (url, options) {
+			var opts = options || {};
+			opts.headers = Object.assign(
+				{ 'Content-Type': 'application/json', 'x-admin-token': token },
+				opts.headers || {}
+			);
+			return fetch(url, opts).then(function (res) {
+				return res.json().catch(function () { return {}; }).then(function (data) {
+					if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+					return data;
+				});
+			});
+		}
+
+		function renderList (posts) {
+			var list = $('list');
+			list.innerHTML = '';
+			if (!posts.length) {
+				list.innerHTML = '<li class="empty">还没有文章</li>';
+				return;
+			}
+			posts.forEach(function (post) {
+				var li = document.createElement('li');
+				li.dataset.slug = post.slug;
+				if (current && current.slug === post.slug) li.className = 'active';
+				var title = document.createElement('div');
+				title.className = 't';
+				title.textContent = post.title;
+				var meta = document.createElement('div');
+				meta.className = 'm';
+				meta.textContent = post.date + ' · ' + (post.tags || []).join(', ');
+				li.appendChild(title);
+				li.appendChild(meta);
+				if (post.draft) {
+					var badge = document.createElement('span');
+					badge.className = 'badge';
+					badge.textContent = '草稿';
+					meta.appendChild(badge);
+				}
+				li.addEventListener('click', function () { open(post.slug); });
+				list.appendChild(li);
+			});
+		}
+
+		function load () {
+			return api('/api/posts').then(function (data) {
+				renderList(data.posts);
+			});
+		}
+
+		function fill (post, body) {
+			current = post;
+			$('editorTitle').textContent = post ? post.title || '未命名' : '未选择文章';
+			$('title').value = post ? post.title || '' : '';
+			$('slug').value = post ? post.slug || '' : '';
+			$('date').value = post ? post.date || '' : '';
+			$('tags').value = post ? (post.tags || []).join(', ') : '';
+			$('summary').value = post ? post.summary || '' : '';
+			$('body').value = body || '';
+			$('draft').checked = post ? !!post.draft : false;
+			$('mode').textContent = post ? '编辑中：' + post.slug : '新建模式';
+			updatePreview();
+		}
+
+		function open (slug) {
+			api('/api/posts/' + encodeURIComponent(slug))
+				.then(function (data) {
+					fill(data.post, data.body);
+					load();
+					setStatus('已载入 ' + slug, 'ok');
+				})
+				.catch(function (err) { setStatus(err.message, 'err'); });
+		}
+
+		function collect () {
+			return {
+				title: $('title').value.trim(),
+				slug: $('slug').value.trim(),
+				date: $('date').value,
+				tags: $('tags').value.split(',').map(function (t) { return t.trim(); }).filter(Boolean),
+				summary: $('summary').value.trim(),
+				draft: $('draft').checked,
+				body: $('body').value
+			};
+		}
+
+		function save () {
+			var data = collect();
+			if (!data.title) { setStatus('标题不能为空', 'err'); return; }
+			var isNew = !current;
+			var url = isNew ? '/api/posts' : '/api/posts/' + encodeURIComponent(current.slug);
+			api(url, { method: isNew ? 'POST' : 'PUT', body: JSON.stringify(data) })
+				.then(function (res) {
+					current = res.post;
+					$('mode').textContent = '编辑中：' + current.slug;
+					setStatus('已保存，线上立即生效', 'ok');
+					return load();
+				})
+				.catch(function (err) { setStatus(err.message, 'err'); });
+		}
+
+		function remove () {
+			if (!current) { setStatus('请先选择文章', 'err'); return; }
+			if (!confirm('确认删除《' + current.title + '》？此操作不可撤销。')) return;
+			api('/api/posts/' + encodeURIComponent(current.slug), { method: 'DELETE' })
+				.then(function () {
+					current = null;
+					fill(null, '');
+					setStatus('已删除', 'ok');
+					return load();
+				})
+				.catch(function (err) { setStatus(err.message, 'err'); });
+		}
+
+		function updatePreview () {
+			var content = $('body').value;
+			if (!token) return;
+			api('/api/preview', { method: 'POST', body: JSON.stringify({ content: content }) })
+				.then(function (data) { $('preview').innerHTML = data.html; })
+				.catch(function () { /* 预览失败不打扰编辑 */ });
+		}
+
+		$('connect').addEventListener('click', function () {
+			token = $('token').value.trim();
+			localStorage.setItem(TOKEN_KEY, token);
+			current = null;
+			fill(null, '');
+			load().then(function () { setStatus('已连接', 'ok'); })
+				.catch(function (err) { setStatus(err.message, 'err'); });
+		});
+
+		$('newPost').addEventListener('click', function () {
+			current = null;
+			fill(null, '');
+			setStatus('新建模式：填写后点保存', 'ok');
+		});
+
+		$('save').addEventListener('click', save);
+		$('delete').addEventListener('click', remove);
+		$('body').addEventListener('input', function () {
+			clearTimeout(previewTimer);
+			previewTimer = setTimeout(updatePreview, 500);
+		});
+
+		if (token) {
+			load().then(function () { setStatus('已连接', 'ok'); })
+				.catch(function (err) { setStatus(err.message, 'err'); });
+		}
+	})();
+	</script>
+</body>
+</html>
