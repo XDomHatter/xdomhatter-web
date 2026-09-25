@@ -1,0 +1,98 @@
+extends layout
+
+block content
+	div.game3d
+		header.game3d-header
+			a.game3d-back(href=`${root}games/${suffix}`) &larr; 游戏列表
+			h1.game3d-title= gameTitle
+			p.game3d-sub= gameSub
+
+		//- ---------- 大厅 ----------
+		section#lobby.game3d-lobby
+			div.game3d-panel
+				h2.game3d-panel-title 创建房间
+				p.game3d-panel-desc 设定棋盘边长与连子数，生成房间号后发给对手。
+
+				div.game3d-field
+					label(for="opt-n") 棋盘边长 N
+					input#opt-n(type="range" min="3" max="8" value="4" step="1")
+					output#opt-n-out 4
+				p.game3d-hint 棋盘为 N×N×N，共 #[span#opt-cells 64] 格。N 越大越难连成。
+
+				div.game3d-field
+					label(for="opt-m") 连子数 M
+					input#opt-m(type="range" min="3" max="8" value="4" step="1")
+					output#opt-m-out 4
+				p#opt-m-hint.game3d-hint 需要连续 M 个同色格子，M 不得超过 N。
+
+				div.game3d-field
+					label(for="opt-grid") 显示网格
+					label.game3d-switch
+						input#opt-grid(type="checkbox" checked)
+						span 显示
+				p.game3d-hint 关闭网格可提升难度：只显示已落下的棋子。
+
+				div.game3d-field
+					label(for="opt-name") 你的昵称
+					input#opt-name.game3d-input(type="text" maxlength="16" placeholder="可留空")
+
+				button#btn-create.game3d-btn.is-primary(type="button") 创建房间
+
+			div.game3d-panel
+				h2.game3d-panel-title 加入房间
+				p.game3d-panel-desc 输入对手给你的 4 位房间号。
+
+				div.game3d-field
+					label(for="join-room") 房间号
+					input#join-room.game3d-input.is-code(type="text" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off")
+
+				button#btn-join.game3d-btn(type="button") 加入房间
+
+			p#lobby-msg.game3d-msg
+
+		//- ---------- 对局 ----------
+		section#arena.game3d-arena(hidden)
+			div.game3d-hud
+				div.game3d-hud-left
+					span#hud-room.game3d-room 房间 ----
+					span#hud-config.game3d-meta
+				div.game3d-turn
+					span#hud-dot.game3d-dot
+					span#hud-turn.game3d-turn-text 等待对手…
+					span#hud-timer.game3d-timer
+
+			div#stage.game3d-stage
+				canvas#canvas3d
+				div#stage-tip.game3d-stage-tip 拖拽旋转 · 滚轮缩放 · 点击落子
+				div#overlay.game3d-overlay(hidden)
+					div.game3d-overlay-card
+						h3#overlay-title.game3d-overlay-title
+						p#overlay-desc.game3d-overlay-desc
+						div.game3d-overlay-actions
+							button#btn-again.game3d-btn.is-primary(type="button") 再来一局
+							button#btn-exit.game3d-btn(type="button") 退出房间
+
+			div.game3d-actions
+				label.game3d-switch.game3d-switch-inline
+					input#arena-grid(type="checkbox" checked)
+					span 网格
+				button#btn-recenter.game3d-btn.is-small(type="button") 重置视角
+				button#btn-resign.game3d-btn.is-small.is-danger(type="button") 认输
+				button#btn-leave.game3d-btn.is-small(type="button") 离开
+
+			p#arena-msg.game3d-msg
+
+		//- 规则说明
+		details.game3d-rules
+			summary 规则
+			ul
+				li 棋盘是 N³ 个格子，每个格子由 (x, y, z) 唯一确定，坐标取值 0…N-1。
+				li 双方轮流在空格落子，先形成连续 M 个同色格子的一方获胜。
+				li 「连续」包含 13 个方向：3 条轴向、6 条面对角线、4 条体对角线。
+				li 棋盘下满且无人连成 M 子为平局。
+				li 单步限时 120 秒、掉线宽限 60 秒，超时判负。
+
+	if jsInline
+		script!= jsInline
+	else
+		script(src=`${root}js/game3d.js`)

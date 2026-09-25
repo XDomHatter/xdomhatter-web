@@ -1,5 +1,14 @@
 node_modules/
 
+# 构建产物（由 gulp build 生成，不入库）
+dist/
+
+# 本地工作区记忆（WorkBuddy AI 的项目笔记）
+.workbuddy-ai/
+
+# 由 lib/gomoku3d-rules.js 同步生成（npm run sync-rules），勿入库
+src/js/gomoku3d-rules.js
+
 logs
 *.log
 npm-debug.log*

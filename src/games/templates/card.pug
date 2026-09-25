@@ -1,0 +1,10 @@
+span.games-item-category= game.category
+h3.games-item-title= game.title
+if game.summary
+	p.games-item-summary= game.summary
+if game.controls
+	span.games-item-controls= game.controls
+if game.tags.length
+	ul.games-item-tags
+		each name in game.tags
+			li= name

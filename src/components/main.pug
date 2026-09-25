@@ -6,7 +6,7 @@
 				h1(data-translate="name") #{main.name}
 				h2#signature(data-translate="signature") #{main.signature}
 
-			- const { first , second , third, fourth, fifth } = main.ul
+			- const { first , second , third, fourth, fifth, sixth } = main.ul
 			ul
 				li
 					a(href=`${first.href}` aria-label=`${first.text}`)
@@ -28,12 +28,20 @@
 						i(class=`icon icon-${fourth.icon}`)
 						span(data-translate=`${fourth.text}`) #{fourth.text}
 
-				if fifth
-					li
-						a(href=`${fifth.href}` aria-label=`${fifth.text}`)
-							i(class=`icon icon-${fifth.icon}`)
-								svg(viewBox="0 0 24 24" aria-hidden="true")
-									path(d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z")
-							span(data-translate=`${fifth.text}`) #{fifth.text}
+			if fifth
+				li
+					a(href=`${fifth.href}` aria-label=`${fifth.text}`)
+						i(class=`icon icon-${fifth.icon}`)
+							svg(viewBox="0 0 24 24" aria-hidden="true")
+								path(d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z")
+						span(data-translate=`${fifth.text}`) #{fifth.text}
+
+			if sixth
+				li
+					a(href=`${sixth.href}` aria-label=`${sixth.text}`)
+						i(class=`icon icon-${sixth.icon}`)
+							svg(viewBox="0 0 24 24" aria-hidden="true")
+								path(d="M15 2H9c-1.1 0-2 .9-2 2v2H5c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-2V4c0-1.1-.9-2-2-2zm-6 4V4h6v2H9zM8 19H6v-2H4v-2h2v-2h2v2h2v2H8v2zm8.5-1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm-3-3a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-3a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z")
+						span(data-translate=`${sixth.text}`) #{sixth.text}
 
 	canvas.grid-background#gridCanvas

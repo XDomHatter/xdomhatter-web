@@ -11,6 +11,7 @@ const express = require('express')
 const matter = require('gray-matter')
 const render = require('../lib/render')
 const store = require('./store')
+const gameServer = require('./gomoku3d')
 
 const ROOT = render.ROOT
 const DIST = path.join(ROOT, 'dist')
@@ -48,6 +49,59 @@ function baseOptions (extra) {
 /* ---------------- Timer -----------------*/
 app.get('/timer', (req, res) => {
 	res.sendFile(path.join(DIST, 'timer.html'));
+})
+
+/* ---------------- 游戏模块 ---------------- */
+app.get(['/games', '/games/'], function (req, res) {
+	const catalog = render.buildGamesCatalog((config.games || {}).catalog)
+	const gamesConf = config.games || {}
+	const title = gamesConf.title || 'Games'
+
+	res.type('html').send(
+		render.renderGames({
+			root: '/',
+			homeHref: '',
+			title: title + ' · ' + config.head.title,
+			description: gamesConf.description || config.head.description || '',
+			gamesTitle: title,
+			gamesDesc: gamesConf.description || '',
+			gamesBack: gamesConf.back || 'Home',
+			gamesListTitle: gamesConf.listTitle || 'Games',
+			gamesEmpty: gamesConf.empty || 'No games yet',
+			gamesFootnote: gamesConf.footnote || '',
+			gamesSearch: gamesConf.search !== false,
+			gamesFilters: gamesConf.filters !== false,
+			showCount: gamesConf.count !== false,
+			categories: catalog.categories,
+			games: catalog.list,
+			cssInline: null,
+			jsInline: null
+		})
+	)
+})
+
+/* ---------------- 三维连珠（联机对局） ---------------- */
+const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js'
+
+app.get(['/games/gomoku3d', '/games/gomoku3d/'], function (req, res) {
+	const gamesConf = config.games || {}
+	const title = '三维连珠'
+	res.type('html').send(
+		render.renderGomoku3D({
+			root: '/',
+			suffix: '',
+			title: title + ' · ' + (gamesConf.title || '') + ' · ' + config.head.title,
+			description: 'N³ 立方棋盘上的 M 子连珠，13 个方向判定胜负，房间号联机对局。',
+			gameTitle: title,
+			gameSub: 'N³ 立方棋盘 · 13 个方向判定 · 房间号联机',
+			cssInline: null,
+			jsInline: null,
+			rulesInline: null,
+			rulesSrc: 'js/gomoku3d-rules.js',
+			extraCss: 'css/game3d.css',
+			extraHead: '<script src="' + THREE_URL + '"></script>'
+		})
+	)
 })
 
 /* ---------------- 博客前台 ---------------- */
@@ -241,12 +295,15 @@ if (require.main === module) {
 	if (!ADMIN_TOKEN) {
 		console.warn('[blog] 警告：未设置 BLOG_ADMIN_TOKEN，/api 接口将全部返回 503')
 	}
-	app.listen(PORT, function () {
+	const server = app.listen(PORT, function () {
 		console.log('[blog] 监听 http://localhost:' + PORT)
 		console.log('[blog] 博客 /blog    后台 /admin')
+		console.log('[games] 游戏 /games    三维连珠 /games/gomoku3d')
+		console.log('[ws] 联机对局 ws://localhost:' + PORT + gameServer.PATH)
 		console.log('[timer] 计时器 /timer')
 		console.log('[blog] 文章目录 ' + store.POSTS_DIR)
 	})
+	gameServer.createGameServer(server)
 }
 
 module.exports = app

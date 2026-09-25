@@ -1,0 +1,51 @@
+extends layout
+
+block content
+	div.games
+		header.games-header
+			a.games-back(href=`${root}${homeHref}`) &larr; #{gamesBack}
+			h1.games-title= gamesTitle
+			if gamesDesc
+				p.games-desc= gamesDesc
+
+		nav.games-nav(aria-label=gamesListTitle)
+			div.games-nav-head
+				h2.games-list-title= gamesListTitle
+				p#games-count.games-count
+
+			if gamesSearch
+				div.games-tools
+					input#games-search.games-search(type="search" placeholder="搜索游戏名、分类或标签…" autocomplete="off" aria-label="搜索游戏")
+					if gamesFilters
+						ul.games-filters
+							li
+								button.games-chip.is-active(type="button" data-category="") 全部
+							each item in categories
+								li
+									button.games-chip(type="button" data-category=item.name)
+										| #{item.name}
+										span.games-chip-count #{item.count}
+
+			ul#games-list.games-list
+				each game in games
+					li.games-item(data-category=game.category data-title=game.title data-summary=game.summary data-tags=game.tags.join(',') class=game.planned ? 'is-planned' : '')
+						if game.href
+							a.games-item-link(href=game.href)
+								include card
+							span.games-item-hint Enter
+						else
+							div.games-item-link.is-disabled(aria-disabled="true")
+								include card
+							span.games-item-hint 待上线
+
+			p#games-empty.games-empty= gamesEmpty
+
+		footer.games-footer
+			a.games-back(href=`${root}${homeHref}`) &larr; 返回主页
+			if gamesFootnote
+				span.games-footnote= gamesFootnote
+
+	if jsInline
+		script!= jsInline
+	else
+		script(src=`${root}js/games.js`)
