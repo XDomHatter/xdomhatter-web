@@ -44,6 +44,11 @@
 				"href": "blog/",
 				"icon": "blog",
 				"text": "Blog"
+			},
+			"sixth": {
+				"href": "games/",
+				"icon": "games",
+				"text": "Games"
 			}
 		}
 	},
@@ -51,5 +56,28 @@
 		"title": "Blog",
 		"description": "Code & Input & Output",
 		"url": "http://xdomhatter.cn"
+	},
+	"games": {
+		"title": "Games",
+		"description": "键盘、像素与一点无用之用",
+		"back": "Home",
+		"listTitle": "游戏列表",
+		"search": true,
+		"filters": true,
+		"count": true,
+		"empty": "没有匹配的游戏",
+		"footnote": "更多游戏正在施工中",
+		"catalog": [
+			{
+				"title": "三维连珠",
+				"slug": "gomoku3d",
+				"href": "gomoku3d/",
+				"category": "Board",
+				"summary": "N³ 立方棋盘上的 M 子连珠。13 条方向全部算数，包括体对角线。",
+				"controls": "拖拽旋转 / 滚轮缩放 / 点击落子",
+				"tags": ["棋类", "对战", "联机", "三维"],
+				"status": "online"
+			}
+		]
 	}
 }

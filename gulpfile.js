@@ -17,7 +17,7 @@ const path = require('path');
 const config = require('./config.json')
 
 gulp.task('clean', function () {
-	return del(['./dist/css/', './dist/js/', './dist/blog/'])
+	return del(['./dist/css/', './dist/js/', './dist/blog/', './dist/games/'])
 })
 
 gulp.task('css', function () {
@@ -76,7 +76,18 @@ gulp.task('blog', function () {
 		})
 })
 
-gulp.task('build', gulp.series('clean', 'assets', 'pug', 'css', 'js', 'html', 'timer', 'blog'))
+gulp.task('games', function () {
+	// js 任务已编译过 src/js/*.js，这里只需保证规则模块已同步，
+	// 再交给 build-games 把它们内联进页面。
+	return Promise.resolve()
+		.then(require('./scripts/sync-rules.js'))
+		.then(require('./scripts/build-games.js'))
+		.then(function () {
+			return gulp.src('./dist/games/**/*.html').pipe(connect.reload())
+		})
+})
+
+gulp.task('build', gulp.series('clean', 'assets', 'pug', 'css', 'js', 'html', 'timer', 'blog', 'games'))
 gulp.task('default', gulp.series('build'))
 
 gulp.task('watch', function () {
@@ -84,7 +95,9 @@ gulp.task('watch', function () {
 	gulp.watch('./src/index.pug', gulp.parallel('pug'))
 	gulp.watch('./src/css/**/*.scss', gulp.parallel(['css']))
 	gulp.watch('./src/js/*.js', gulp.parallel(['js']))
-	gulp.watch(['./src/blog/**/*'], gulp.series('blog'))
+gulp.watch(['./src/blog/**/*'], gulp.series('blog'))
+gulp.watch(['./src/games/**/*', './src/js/gomoku3d-rules.js', './config.json'], gulp.series('games'))
+gulp.watch('./lib/gomoku3d-rules.js', gulp.series('games'))
 	connect.server({
 		root: 'dist',
 		livereload: true,
@@ -120,5 +133,9 @@ gulp.task('serve', function () {
 		res.sendFile(path.join(distPath, 'blog', 'index.html'));
 	})
 
-    app.listen(80, () => console.log("Server listening on :80"));
+	app.get(['/games', '/games/'], (req, res) => {
+		res.sendFile(path.join(distPath, 'games', 'index.html'));
+	})
+
+	app.listen(80, () => console.log("Server listening on :80"));
 });
