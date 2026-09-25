@@ -1,0 +1,628 @@
+@bg: #060606;
+@bg-soft: #0d0e10;
+@border: rgba(255, 255, 255, 0.1);
+@border-strong: rgba(255, 255, 255, 0.28);
+@text: #93979e;
+@text-strong: #e6e6e6;
+@text-dim: #6b6f76;
+@link: #b6b6b6;
+@link-hover: #f6f6f6;
+@accent: #7f77dd;
+
+@p1: #ff6b6b; // 玩家 1（红，符合中式先手直觉）
+@p2: #4fc3f7; // 玩家 2（蓝）
+
+@ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+@ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+html {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	background-color: @bg;
+	overscroll-behavior: none;
+}
+
+body.games-body {
+	min-height: 100%;
+	margin: 0;
+	padding: 0;
+	background-color: @bg;
+	background-image: radial-gradient(
+			ellipse 80% 50% at 50% -10%,
+			rgba(127, 119, 221, 0.16),
+			transparent 62%
+		);
+	background-repeat: no-repeat;
+	background-attachment: fixed;
+	color: @text;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue',
+		'Microsoft Yahei', sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+
+.game3d {
+	box-sizing: border-box;
+	min-height: 100vh;
+	padding: 24px 20px 40px;
+
+	*,
+	*::before,
+	*::after {
+		box-sizing: inherit;
+	}
+
+	a {
+		color: @link;
+		text-decoration: none;
+		transition: color 0.25s @ease;
+
+		&:hover {
+			color: @link-hover;
+		}
+	}
+
+	:focus-visible {
+		outline: 1px solid rgba(127, 119, 221, 0.8);
+		outline-offset: 3px;
+	}
+}
+
+/* ---------------- 头部 ---------------- */
+.game3d-header {
+	max-width: 960px;
+	margin: 0 auto 22px;
+
+	> * {
+		animation: g3dRise 0.55s @ease-out both;
+	}
+
+	> *:nth-child(2) { animation-delay: 0.06s; }
+	> *:nth-child(3) { animation-delay: 0.12s; }
+}
+
+.game3d-back {
+	display: inline-block;
+	margin-bottom: 14px;
+	font-size: 13px;
+	letter-spacing: 1px;
+	color: @text-dim;
+
+	&:hover {
+		color: @link-hover;
+	}
+}
+
+.game3d-title {
+	margin: 0;
+	color: @text-strong;
+	font-size: 26px;
+	font-weight: 300;
+	letter-spacing: 3px;
+}
+
+.game3d-sub {
+	margin: 6px 0 0;
+	color: @text-dim;
+	font-size: 13px;
+	letter-spacing: 1px;
+}
+
+/* ---------------- 大厅 ---------------- */
+.game3d-lobby {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	gap: 16px;
+	max-width: 960px;
+	margin: 0 auto;
+	animation: g3dRise 0.55s @ease-out 0.16s both;
+}
+
+.game3d-panel {
+	padding: 22px 20px;
+	background: rgba(255, 255, 255, 0.02);
+	border: 1px solid @border;
+	border-radius: 12px;
+	transition: border-color 0.3s @ease;
+}
+
+.game3d-panel-title {
+	margin: 0 0 6px;
+	color: @text-strong;
+	font-size: 16px;
+	font-weight: 400;
+	letter-spacing: 1px;
+}
+
+.game3d-panel-desc {
+	margin: 0 0 16px;
+	color: @text-dim;
+	font-size: 12.5px;
+	line-height: 1.7;
+}
+
+.game3d-field {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin: 12px 0 4px;
+
+	label {
+		flex: 0 0 88px;
+		color: @text;
+		font-size: 13px;
+	}
+
+	input[type='range'] {
+		flex: 1;
+		min-width: 0;
+		height: 4px;
+		background: rgba(255, 255, 255, 0.12);
+		border-radius: 999px;
+		outline: none;
+		-webkit-appearance: none;
+		appearance: none;
+		cursor: pointer;
+
+		&::-webkit-slider-thumb {
+			width: 14px;
+			height: 14px;
+			background: @accent;
+			border-radius: 50%;
+			-webkit-appearance: none;
+			appearance: none;
+			transition: transform 0.2s @ease-out;
+		}
+
+		&::-webkit-slider-thumb:hover {
+			transform: scale(1.15);
+		}
+
+		&::-moz-range-thumb {
+			width: 14px;
+			height: 14px;
+			background: @accent;
+			border: 0;
+			border-radius: 50%;
+		}
+	}
+
+	output {
+		flex: 0 0 28px;
+		color: @text-strong;
+		font-size: 14px;
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+	}
+}
+
+.game3d-hint {
+	margin: 2px 0 10px;
+	color: @text-dim;
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+.game3d-input {
+	width: 100%;
+	flex: 1;
+	min-width: 0;
+	padding: 10px 12px;
+	color: @text-strong;
+	background: @bg-soft;
+	border: 1px solid @border;
+	border-radius: 9px;
+	font-family: inherit;
+	font-size: 14px;
+	outline: none;
+	transition: border-color 0.3s @ease, box-shadow 0.3s @ease;
+
+	&::placeholder {
+		color: @text-dim;
+	}
+
+	&:hover {
+		border-color: rgba(255, 255, 255, 0.18);
+	}
+
+	&:focus {
+		border-color: rgba(127, 119, 221, 0.7);
+		box-shadow: 0 0 0 3px rgba(127, 119, 221, 0.12);
+	}
+
+	&.is-code {
+		flex: 0 0 auto;
+		width: 130px;
+		font-size: 22px;
+		letter-spacing: 8px;
+		text-align: center;
+		font-variant-numeric: tabular-nums;
+	}
+}
+
+.game3d-btn {
+	display: inline-block;
+	margin-top: 16px;
+	padding: 10px 20px;
+	color: @text-strong;
+	background: rgba(255, 255, 255, 0.04);
+	border: 1px solid @border;
+	border-radius: 9px;
+	font-family: inherit;
+	font-size: 14px;
+	letter-spacing: 1px;
+	cursor: pointer;
+	transition: background-color 0.25s @ease, border-color 0.25s @ease,
+		color 0.25s @ease, transform 0.3s @ease-out;
+
+	&:hover:not(:disabled) {
+		color: #fff;
+		background: rgba(255, 255, 255, 0.08);
+		border-color: @border-strong;
+		transform: translateY(-1px);
+	}
+
+	&:active:not(:disabled) {
+		transform: translateY(0) scale(0.985);
+	}
+
+	&:disabled {
+		opacity: 0.42;
+		cursor: not-allowed;
+	}
+
+	&.is-primary {
+		width: 100%;
+		color: #fff;
+		background: rgba(127, 119, 221, 0.32);
+		border-color: fade(@accent, 70%);
+
+		&:hover:not(:disabled) {
+			background: rgba(127, 119, 221, 0.46);
+			border-color: @accent;
+		}
+	}
+
+	&.is-small {
+		margin-top: 0;
+		padding: 7px 14px;
+		font-size: 13px;
+	}
+
+	&.is-danger:hover:not(:disabled) {
+		color: #fff;
+		background: rgba(255, 107, 107, 0.2);
+		border-color: rgba(255, 107, 107, 0.6);
+	}
+}
+
+.game3d-switch {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	color: @text;
+	font-size: 13px;
+	cursor: pointer;
+	user-select: none;
+
+	input {
+		width: 16px;
+		height: 16px;
+		margin: 0;
+		accent-color: @accent;
+		cursor: pointer;
+	}
+
+	&.game3d-switch-inline {
+		flex: 0 0 auto;
+	}
+}
+
+.game3d-msg {
+	max-width: 960px;
+	margin: 16px auto 0;
+	color: #ffb4b4;
+	font-size: 13px;
+	text-align: center;
+	min-height: 18px;
+	opacity: 0;
+	transition: opacity 0.28s @ease;
+
+	&.is-shown {
+		opacity: 1;
+	}
+
+	&.is-info {
+		color: @text-dim;
+	}
+}
+
+/* ---------------- 对局区 ---------------- */
+.game3d-arena {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	max-width: 1100px;
+	margin: 0 auto;
+	animation: g3dRise 0.5s @ease-out both;
+
+	&[hidden] {
+		display: none;
+	}
+}
+
+.game3d-hud {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 10px 14px;
+	background: rgba(13, 14, 16, 0.86);
+	border: 1px solid @border;
+	border-radius: 10px;
+}
+
+.game3d-hud-left {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 12px;
+}
+
+.game3d-room {
+	color: @text-strong;
+	font-size: 15px;
+	letter-spacing: 3px;
+	font-variant-numeric: tabular-nums;
+}
+
+.game3d-meta {
+	color: @text-dim;
+	font-size: 12px;
+	letter-spacing: 1px;
+}
+
+.game3d-turn {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+}
+
+.game3d-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: @text-dim;
+	transition: background-color 0.35s @ease, box-shadow 0.35s @ease;
+}
+
+.game3d-turn.is-p1 .game3d-dot {
+	background: @p1;
+	box-shadow: 0 0 10px fade(@p1, 75%);
+}
+
+.game3d-turn.is-p2 .game3d-dot {
+	background: @p2;
+	box-shadow: 0 0 10px fade(@p2, 75%);
+}
+
+.game3d-turn-text {
+	color: @text-strong;
+	letter-spacing: 1px;
+}
+
+.game3d-timer {
+	color: @text-dim;
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+}
+
+/* 3D 舞台：屏幕正中央 */
+.game3d-stage {
+	position: relative;
+	width: 100%;
+	height: min(72vh, 720px);
+	min-height: 340px;
+	margin-top: 12px;
+	background: radial-gradient(
+			ellipse 60% 60% at 50% 45%,
+			rgba(127, 119, 221, 0.07),
+			transparent 70%
+		),
+		@bg-soft;
+	border: 1px solid @border;
+	border-radius: 12px;
+	overflow: hidden;
+	touch-action: none;
+	cursor: grab;
+
+	&:active {
+		cursor: grabbing;
+	}
+
+	canvas {
+		display: block;
+		width: 100%;
+		height: 100%;
+	}
+}
+
+.game3d-stage-tip {
+	position: absolute;
+	left: 50%;
+	bottom: 12px;
+	transform: translateX(-50%);
+	padding: 5px 12px;
+	color: @text-dim;
+	background: rgba(6, 6, 6, 0.7);
+	border: 1px solid @border;
+	border-radius: 999px;
+	font-size: 11.5px;
+	letter-spacing: 1px;
+	white-space: nowrap;
+	pointer-events: none;
+	transition: opacity 0.4s @ease;
+
+	&.is-hidden {
+		opacity: 0;
+	}
+}
+
+.game3d-overlay {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(6, 6, 6, 0.74);
+	backdrop-filter: blur(3px);
+	animation: g3dFade 0.35s @ease-out both;
+
+	&[hidden] {
+		display: none;
+	}
+}
+
+.game3d-overlay-card {
+	padding: 30px 36px;
+	background: #0f1013;
+	border: 1px solid @border-strong;
+	border-radius: 14px;
+	text-align: center;
+	animation: g3dRise 0.45s @ease-out both;
+}
+
+.game3d-overlay-title {
+	margin: 0;
+	color: #fff;
+	font-size: 24px;
+	font-weight: 300;
+	letter-spacing: 3px;
+}
+
+.game3d-overlay-desc {
+	margin: 10px 0 0;
+	color: @text-dim;
+	font-size: 13px;
+	letter-spacing: 1px;
+}
+
+.game3d-overlay-actions {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 10px;
+	margin-top: 20px;
+
+	.game3d-btn {
+		margin-top: 0;
+
+		&.is-primary {
+			width: auto;
+		}
+	}
+}
+
+.game3d-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+	margin-top: 12px;
+}
+
+/* ---------------- 规则 ---------------- */
+.game3d-rules {
+	max-width: 960px;
+	margin: 28px auto 0;
+	padding: 14px 18px;
+	color: @text-dim;
+	background: rgba(255, 255, 255, 0.015);
+	border: 1px solid @border;
+	border-radius: 10px;
+	font-size: 13px;
+
+	summary {
+		color: @text;
+		cursor: pointer;
+		letter-spacing: 1px;
+		outline: none;
+	}
+
+	ul {
+		margin: 12px 0 0;
+		padding-left: 20px;
+		line-height: 1.85;
+	}
+
+	li {
+		margin: 4px 0;
+	}
+}
+
+@media screen and (max-width: 540px) {
+	.game3d {
+		padding: 16px 12px 28px;
+	}
+
+	.game3d-title {
+		font-size: 21px;
+	}
+
+	.game3d-stage {
+		height: min(58vh, 520px);
+		min-height: 280px;
+	}
+
+	.game3d-input.is-code {
+		width: 110px;
+		font-size: 19px;
+		letter-spacing: 5px;
+	}
+
+	.game3d-overlay-card {
+		padding: 24px 22px;
+	}
+}
+
+@keyframes g3dRise {
+	from {
+		opacity: 0;
+		transform: translateY(12px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@keyframes g3dFade {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.game3d-header > *,
+	.game3d-lobby,
+	.game3d-arena,
+	.game3d-overlay,
+	.game3d-overlay-card {
+		animation: none;
+		opacity: 1;
+		transform: none;
+	}
+
+	.game3d-btn,
+	.game3d-panel,
+	.game3d-msg,
+	.game3d-dot,
+	.game3d-stage-tip {
+		transition-duration: 0.01ms;
+	}
+}

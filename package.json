@@ -12,6 +12,13 @@
 		"dev": "gulp watch",
 		"build": "gulp build",
 		"blog": "node scripts/build-blog.js",
+		"games": "node scripts/build-games.js",
+		"sync-rules": "node scripts/sync-rules.js",
+		"test:rules": "node scripts/test-gomoku3d-rules.js",
+		"test:server": "node scripts/test-gomoku3d.js",
+		"test:render": "node scripts/test-render-math.js",
+		"test": "node scripts/test-gomoku3d-rules.js && node scripts/test-gomoku3d.js && node scripts/test-render-math.js",
+		"test:live": "node scripts/smoke-live.js",
 		"serve": "gulp serve",
 		"start": "node server/app.js",
 		"help": "echo BLOG_ADMIN_TOKEN for token and XDHPAGE_PORT for port"
@@ -24,7 +31,8 @@
 		"katex": "^0.16.47",
 		"markdown-it": "^14.3.2",
 		"markdown-it-anchor": "^9.2.1",
-		"pug": "^2.0.4"
+		"pug": "^2.0.4",
+		"ws": "^8.21.3"
 	},
 	"devDependencies": {
 		"@babel/core": "^7.4.4",
