@@ -56,6 +56,7 @@ block content
 				div.game3d-hud-left
 					span#hud-room.game3d-room 房间 ----
 					span#hud-config.game3d-meta
+					span#hud-last.game3d-meta
 				div.game3d-turn
 					span#hud-dot.game3d-dot
 					span#hud-turn.game3d-turn-text 等待对手…
@@ -63,7 +64,7 @@ block content
 
 			div#stage.game3d-stage
 				canvas#canvas3d
-				div#stage-tip.game3d-stage-tip 拖拽旋转 · 滚轮缩放 · 点击落子
+				div#stage-tip.game3d-stage-tip 拖拽旋转 · 滚轮缩放 · 在下方输入坐标落子
 				div#overlay.game3d-overlay(hidden)
 					div.game3d-overlay-card
 						h3#overlay-title.game3d-overlay-title
@@ -71,6 +72,28 @@ block content
 						div.game3d-overlay-actions
 							button#btn-again.game3d-btn.is-primary(type="button") 再来一局
 							button#btn-exit.game3d-btn(type="button") 退出房间
+
+			//- ---------- 坐标落子控制台 ----------
+			div#move-console.game3d-console
+				div.game3d-axes
+					each axis in axes
+						span.game3d-axis(class=`is-${axis.key}` style=`--axis-color:${axis.color}`)
+							b= axis.label
+							| 正方向 → 屏幕#{axis.screen}
+
+				form#move-form.game3d-coords(novalidate)
+					label.game3d-coord
+						span.game3d-coord-key x
+						input#coord-x.game3d-coord-input(type="text" inputmode="numeric" autocomplete="off" maxlength="1" placeholder="0" aria-label="x 坐标")
+					label.game3d-coord
+						span.game3d-coord-key y
+						input#coord-y.game3d-coord-input(type="text" inputmode="numeric" autocomplete="off" maxlength="1" placeholder="0" aria-label="y 坐标")
+					label.game3d-coord
+						span.game3d-coord-key z
+						input#coord-z.game3d-coord-input(type="text" inputmode="numeric" autocomplete="off" maxlength="1" placeholder="0" aria-label="z 坐标")
+					button#btn-move.game3d-btn.is-primary(type="submit") 落子
+
+				p#coord-hint.game3d-move-hint
 
 			div.game3d-actions
 				label.game3d-switch.game3d-switch-inline
@@ -87,6 +110,12 @@ block content
 			summary 规则
 			ul
 				li 棋盘是 N³ 个格子，每个格子由 (x, y, z) 唯一确定，坐标取值 0…N-1。
+				li 落子方式：在下方输入框填写 x、y、z 三个坐标后按「落子」（或回车）。
+					| 画布只用于观察，拖拽旋转、滚轮缩放，点击不会落子。
+				li 坐标正方向以棋盘最小角的三支箭头为准：
+					each axis in axes
+						|  #[b= axis.label] 指向屏幕#{axis.screen}#{axis === axes[axes.length - 1] ? '。' : '，'}
+				li 输入坐标时，棋盘上会出现半透明预览球，落子前即可确认位置。
 				li 双方轮流在空格落子，先形成连续 M 个同色格子的一方获胜。
 				li 「连续」包含 13 个方向：3 条轴向、6 条面对角线、4 条体对角线。
 				li 棋盘下满且无人连成 M 子为平局。

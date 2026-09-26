@@ -83,11 +83,15 @@
 			if (state.category) parts.push('cat=' + encodeURIComponent(state.category));
 			if (state.q) parts.push('q=' + encodeURIComponent(state.q));
 			var hash = parts.length ? '#' + parts.join('&') : '';
-			window.history.replaceState(
-				null,
-				'',
-				window.location.pathname + window.location.search + hash
-			);
+			try {
+				window.history.replaceState(
+					null,
+					'',
+					window.location.pathname + window.location.search + hash
+				);
+			} catch (err) {
+				/* file:// 或受限环境会拒绝改写历史，忽略即可 */
+			}
 		}
 
 		function readHash () {

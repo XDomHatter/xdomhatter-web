@@ -10,6 +10,7 @@ const crypto = require('crypto')
 const express = require('express')
 const matter = require('gray-matter')
 const render = require('../lib/render')
+const Rules = require('../lib/gomoku3d-rules')
 const store = require('./store')
 const gameServer = require('./gomoku3d')
 
@@ -52,7 +53,27 @@ app.get('/timer', (req, res) => {
 })
 
 /* ---------------- 游戏模块 ---------------- */
+
+/**
+ * 把不带结尾斜杠的路径 301 到带斜杠的规范形式。
+ *
+ * 原因：游戏列表页里的卡片链接是相对本页解析的（config.json 里写的是 "gomoku3d/"）。
+ * 从 /games/ 打开时它解析为 /games/gomoku3d/，正确；但直接从 /games 打开时，
+ * 浏览器以 / 为基准解析成 /gomoku3d/，就会 404。
+ *
+ * 注意：Express 默认关闭 strict routing，/games 与 /games/ 会命中同一个 handler，
+ * 因此不能用两个 app.get 分别处理，否则会自我重定向成死循环。
+ */
+function ensureTrailingSlash (req, res) {
+	if (req.path.charAt(req.path.length - 1) === '/') return false
+	const qs = req.url.indexOf('?')
+	res.redirect(301, req.path + '/' + (qs >= 0 ? req.url.slice(qs) : ''))
+	return true
+}
+
 app.get(['/games', '/games/'], function (req, res) {
+	if (ensureTrailingSlash(req, res)) return
+
 	const catalog = render.buildGamesCatalog((config.games || {}).catalog)
 	const gamesConf = config.games || {}
 	const title = gamesConf.title || 'Games'
@@ -84,6 +105,8 @@ app.get(['/games', '/games/'], function (req, res) {
 const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js'
 
 app.get(['/games/gomoku3d', '/games/gomoku3d/'], function (req, res) {
+	if (ensureTrailingSlash(req, res)) return
+
 	const gamesConf = config.games || {}
 	const title = '三维连珠'
 	res.type('html').send(
@@ -91,9 +114,11 @@ app.get(['/games/gomoku3d', '/games/gomoku3d/'], function (req, res) {
 			root: '/',
 			suffix: '',
 			title: title + ' · ' + (gamesConf.title || '') + ' · ' + config.head.title,
-			description: 'N³ 立方棋盘上的 M 子连珠，13 个方向判定胜负，房间号联机对局。',
+			description:
+				'N³ 立方棋盘上的 M 子连珠，双方输入 (x, y, z) 坐标落子，13 个方向判定胜负，支持房间号联机。',
 			gameTitle: title,
-			gameSub: 'N³ 立方棋盘 · 13 个方向判定 · 房间号联机',
+			gameSub: 'N³ 立方棋盘 · 坐标落子 · 13 个方向判定 · 房间号联机',
+			axes: Rules.AXES,
 			cssInline: null,
 			jsInline: null,
 			rulesInline: null,

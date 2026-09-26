@@ -1,3 +1,5 @@
+/* 由 lib/gomoku3d-rules.js 同步而来，请勿直接编辑；
+   修改请改 lib 下的源文件，然后运行 npm run sync-rules */
 /**
  * 三维连珠核心规则（服务端 / 浏览器端共用）。
  *

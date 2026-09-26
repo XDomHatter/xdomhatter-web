@@ -83,6 +83,73 @@ test('inBounds 正确拒绝越界坐标', function () {
 	assert.ok(!Rules.inBounds(n, 0, 0, 9))
 })
 
+/* ---------------- 坐标输入 ---------------- */
+
+console.log('\n[坐标输入]')
+
+test('parseCoord 接受范围内的十进制坐标', function () {
+	assert.strictEqual(Rules.parseCoord('0', 4), 0)
+	assert.strictEqual(Rules.parseCoord('3', 4), 3)
+	assert.strictEqual(Rules.parseCoord(2, 4), 2, '数字也应可用')
+	assert.strictEqual(Rules.parseCoord(' 2 ', 4), 2, '应容忍前后空白')
+	assert.strictEqual(Rules.parseCoord('11', 12), 11, 'N=12 时两位数是合法的')
+})
+
+test('parseCoord 拒绝越界坐标', function () {
+	assert.strictEqual(Rules.parseCoord('4', 4), null)
+	assert.strictEqual(Rules.parseCoord('9', 4), null)
+	assert.strictEqual(Rules.parseCoord('12', 12), null)
+	assert.strictEqual(Rules.parseCoord('-1', 4), null)
+})
+
+test('parseCoord 拒绝 Number() 会放过的伪坐标', function () {
+	// 这些是「用 Number() 直接转换」时最容易漏掉的一类输入
+	assert.strictEqual(Rules.parseCoord('1e3', 8), null)
+	assert.strictEqual(Rules.parseCoord('0x2', 8), null)
+	assert.strictEqual(Rules.parseCoord('1.5', 8), null)
+	assert.strictEqual(Rules.parseCoord('+2', 8), null)
+	assert.strictEqual(Rules.parseCoord('1,2', 8), null)
+	assert.strictEqual(Rules.parseCoord('0b1', 8), null)
+})
+
+test('parseCoord 拒绝空值与非法棋盘边长', function () {
+	assert.strictEqual(Rules.parseCoord('', 4), null)
+	assert.strictEqual(Rules.parseCoord('   ', 4), null)
+	assert.strictEqual(Rules.parseCoord(null, 4), null)
+	assert.strictEqual(Rules.parseCoord(undefined, 4), null)
+	assert.strictEqual(Rules.parseCoord(NaN, 4), null)
+	assert.strictEqual(Rules.parseCoord('0', 0), null)
+	assert.strictEqual(Rules.parseCoord('0', 4.5), null)
+	assert.strictEqual(Rules.parseCoord('0', '4'), null)
+})
+
+test('formatCoord 与 parseCoord 往返一致', function () {
+	const n = 8
+	for (let x = 0; x < n; x++) {
+		const text = Rules.formatCoord(x, 1, 2)
+		assert.strictEqual(text, x + ',1,2')
+		assert.strictEqual(Rules.parseCoord(text.split(',')[0], n), x)
+	}
+})
+
+/* ---------------- 坐标轴定义 ---------------- */
+
+console.log('\n[坐标轴定义]')
+
+test('AXES 提供模板渲染所需的全部字段', function () {
+	// gomoku3d.pug 直接读 axis.key / axis.label / axis.color / axis.screen，
+	// 客户端读 axis.vector，缺任何一项都会在渲染或绘制箭头时报错。
+	assert.strictEqual(Rules.AXES.length, 3)
+	Rules.AXES.forEach(function (axis) {
+		assert.strictEqual(typeof axis.key, 'string')
+		assert.ok(axis.key.length > 0)
+		assert.ok(/^\+\w$/.test(axis.label), 'label 形如 +x，实际 ' + axis.label)
+		assert.ok(/^#[0-9a-f]{6}$/i.test(axis.color), 'color 应为 #rrggbb，实际 ' + axis.color)
+		assert.ok(axis.screen && axis.screen.length > 0, 'screen 文案不能为空')
+		assert.strictEqual(axis.vector.length, 3)
+	})
+})
+
 /* ---------------- 13 个方向 ---------------- */
 
 console.log('\n[13 个方向]')

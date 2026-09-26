@@ -14,6 +14,7 @@ const fs = require('fs')
 const path = require('path')
 
 const render = require('../lib/render')
+const Rules = require('../lib/gomoku3d-rules')
 
 const ROOT = render.ROOT
 const OUT_DIR = path.join(ROOT, 'dist', 'games')
@@ -80,9 +81,10 @@ function buildGomoku3D (cssInline) {
 		suffix: 'index.html',
 		title: '三维连珠 · ' + (gamesConf.title || config.head.title),
 		description:
-			'N³ 立方棋盘上的 M 子连珠，支持房间号在线对战，13 个方向判定胜负。',
+			'N³ 立方棋盘上的 M 子连珠，双方输入 (x, y, z) 坐标落子，13 个方向判定胜负，支持房间号联机。',
 		gameTitle: '三维连珠',
-		gameSub: 'N³ 立方棋盘 · 13 个方向判定 · 房间号联机',
+		gameSub: 'N³ 立方棋盘 · 坐标落子 · 13 个方向判定 · 房间号联机',
+		axes: Rules.AXES,
 		cssInline: cssInline,
 		jsInline: jsInline,
 		rulesInline: rulesInline,

@@ -11,7 +11,8 @@ block content
 		nav.games-nav(aria-label=gamesListTitle)
 			div.games-nav-head
 				h2.games-list-title= gamesListTitle
-				p#games-count.games-count
+				if showCount
+					p#games-count.games-count
 
 			if gamesSearch
 				div.games-tools
@@ -30,7 +31,7 @@ block content
 				each game in games
 					li.games-item(data-category=game.category data-title=game.title data-summary=game.summary data-tags=game.tags.join(',') class=game.planned ? 'is-planned' : '')
 						if game.href
-							a.games-item-link(href=game.href)
+							a.games-item-link(href=game.absoluteHref ? game.href : `${root}games/${game.href}`)
 								include card
 							span.games-item-hint Enter
 						else

@@ -21,6 +21,16 @@ const TURN_TIMEOUT_MS = 120 * 1000 // 单步限时，超时判负
 const HEARTBEAT_MS = 30 * 1000
 const MAX_ROOMS = 500
 
+/**
+ * 两个超时时长的运行时开关。
+ * 之所以不直接引用上面的常量，是为了让测试能把它们改短，
+ * 从而在秒级时间内验证「超时判负」这条服务端单方面触发的路径。
+ */
+const TIMEOUTS = {
+	turn: TURN_TIMEOUT_MS,
+	grace: DISCONNECT_GRACE_MS
+}
+
 const DEFAULT_N = 4
 const DEFAULT_M = 4
 
@@ -64,9 +74,7 @@ class Room {
 		this.createdAt = now()
 		this.touchedAt = now()
 		this.turnDeadline = 0
-		this.graceDeadline = 0
 		this.turnTimer = null
-		this.graceTimer = null
 	}
 
 	touch () {
@@ -113,46 +121,76 @@ class Room {
 			clearTimeout(this.turnTimer)
 			this.turnTimer = null
 		}
-		if (this.graceTimer) {
-			clearTimeout(this.graceTimer)
-			this.graceTimer = null
-		}
+		this.seats.forEach(function (s) {
+			if (!s) return
+			if (s.graceTimer) {
+				clearTimeout(s.graceTimer)
+				s.graceTimer = null
+			}
+			s.graceDeadline = 0
+		})
 		this.turnDeadline = 0
-		this.graceDeadline = 0
 	}
 
 	startTurnTimer () {
 		if (this.turnTimer) clearTimeout(this.turnTimer)
-		this.turnDeadline = now() + TURN_TIMEOUT_MS
+		this.turnDeadline = now() + TIMEOUTS.turn
 		const self = this
 		this.turnTimer = setTimeout(function () {
+			self.turnTimer = null
+			self.turnDeadline = 0
 			if (self.status !== 'playing') return
 			// 当前执子方超时 -> 判负
 			const loserSeat = self.turn - 1
 			self.finish(self.turn === Rules.PLAYER_ONE ? Rules.PLAYER_TWO : Rules.PLAYER_ONE, 'timeout', [], loserSeat)
-		}, TURN_TIMEOUT_MS)
+			// 超时是服务端单方面触发的，必须主动广播，
+			// 否则对手端会一直停在「等待对方」，看不到终局。
+			self.broadcast()
+		}, TIMEOUTS.turn)
 	}
 
+	/**
+	 * 掉线宽限：计时器挂在「座位」上而不是房间上。
+	 * 房间级单例会在双方先后掉线时互相覆盖，也会被另一方的重连误清除，
+	 * 导致掉线方永远得不到裁决。
+	 */
 	startGrace (seat) {
-		if (this.graceTimer) clearTimeout(this.graceTimer)
-		this.graceDeadline = now() + DISCONNECT_GRACE_MS
+		const s = this.seats[seat]
+		if (!s) return
+		if (s.graceTimer) clearTimeout(s.graceTimer)
+		s.graceDeadline = now() + TIMEOUTS.grace
 		const self = this
-		this.graceTimer = setTimeout(function () {
-			const s = self.seats[seat]
-			if (!s || s.connected) return
+		s.graceTimer = setTimeout(function () {
+			s.graceTimer = null
+			s.graceDeadline = 0
+			if (s.connected) return
 			if (self.status !== 'playing') return
 			// 掉线方判负
-			const winner = self.playerOf(seat === 0 ? 1 : 0)
-			self.finish(winner, 'disconnect', [], seat)
-		}, DISCONNECT_GRACE_MS)
+			self.finish(self.playerOf(seat === 0 ? 1 : 0), 'disconnect', [], seat)
+			// 同上：掉线判负也必须广播
+			self.broadcast()
+		}, TIMEOUTS.grace)
 	}
 
-	stopGrace () {
-		if (this.graceTimer) {
-			clearTimeout(this.graceTimer)
-			this.graceTimer = null
+	stopGrace (seat) {
+		const s = this.seats[seat]
+		if (!s) return
+		if (s.graceTimer) {
+			clearTimeout(s.graceTimer)
+			s.graceTimer = null
 		}
-		this.graceDeadline = 0
+		s.graceDeadline = 0
+	}
+
+	/** 当前仍在宽限中的最大剩余毫秒数（双方都可能同时掉线） */
+	graceRemainMs () {
+		let max = 0
+		this.seats.forEach(function (s) {
+			if (!s || !s.graceDeadline) return
+			const left = s.graceDeadline - now()
+			if (left > max) max = left
+		})
+		return max
 	}
 
 	finish (winner, reason, winCells, loserSeat) {
@@ -234,7 +272,7 @@ class Room {
 			moveCount: this.moveCount,
 			board: Array.from(this.board),
 			turnRemainMs: this.turnDeadline ? Math.max(0, this.turnDeadline - now()) : 0,
-			graceRemainMs: this.graceDeadline ? Math.max(0, this.graceDeadline - now()) : 0,
+			graceRemainMs: this.graceRemainMs(),
 			seats: this.seats.map(function (s, i) {
 				return s
 					? { name: s.name, connected: s.connected, player: i + 1 }
@@ -449,7 +487,8 @@ function onJoin (ws, msg) {
 			}
 		}
 		attach(ws, room, existSeat, s.token)
-		room.stopGrace()
+		// 只清除「本座位」的宽限：对手若正在宽限中，不能被这次重连顺带取消
+		room.stopGrace(existSeat)
 		send(ws, 'joined', {
 			room: room.code,
 			seat: existSeat,
@@ -547,6 +586,7 @@ function onLeave (ws) {
 			const winner = room.playerOf(seat === 0 ? 1 : 0)
 			room.finish(winner, 'leave', [], seat)
 		}
+		room.stopGrace(seat)
 		room.seats[seat] = null
 		if (s) {
 			s.connected = false
@@ -565,5 +605,6 @@ module.exports = {
 	createGameServer: createGameServer,
 	rooms: rooms,
 	PATH: PATH,
-	Room: Room
+	Room: Room,
+	TIMEOUTS: TIMEOUTS
 }

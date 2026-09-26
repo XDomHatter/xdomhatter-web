@@ -3,8 +3,11 @@
  *
  * 职责划分：
  *   - 网络层只管收发与重连，不做任何裁决（规则以服务端为准）。
- *   - 渲染层用 three.js 把 N³ 格子画在屏幕正中央，支持拖拽旋转、滚轮缩放、点击拾取。
- *   - 交互层把点击换算成 (x,y,z) 发给服务端。
+ *   - 渲染层用 three.js 把 N³ 格子画在屏幕正中央，支持拖拽旋转、滚轮缩放。
+ *   - 交互层不提供点击落子：双方通过在输入框里填写 (x, y, z) 落子，
+ *     坐标取值 0…N-1，正方向由棋盘角落的 +x/+y/+z 箭头标定。
+ *     之所以不用点击，是因为三维投影下「看到的那一格」与「实际想落的那一格」
+ *     会因遮挡而错位；坐标输入没有这个歧义。
  *
  * 依赖：three.js（CDN 全局 THREE）、页面内联的 Gomoku3DRules。
  */
@@ -16,6 +19,22 @@
 	var COLOR_P2 = 0x4fc3f7;
 	var COLOR_GRID = 0xffffff;
 	var CELL_GAP = 0.12; // 棋子相对格宽的内缩，便于看清格线
+
+	/**
+	 * 三个坐标轴的正方向（定义在 Gomoku3DRules.AXES，与页面图例、规则说明同源）。
+	 * 三维投影下光看格线无法判断坐标正方向，这是坐标落子的必要前提。
+	 *
+	 * 必须延迟取用：layout.pug 把规则模块的 <script> 放在 block content 之后，
+	 * 也就是排在 game3d.js 后面，顶层直接读 window.Gomoku3DRules 会拿到 undefined。
+	 */
+	function axes() {
+		return (window.Gomoku3DRules && window.Gomoku3DRules.AXES) || [];
+	}
+
+	/** "#ffd166" -> 0xffd166，供 three.js 使用 */
+	function hexToInt(hex) {
+		return parseInt(String(hex).replace('#', ''), 16);
+	}
 
 	function $(sel) {
 		return document.querySelector(sel);
@@ -135,28 +154,30 @@
 		this.cellGroup = null; // 格线
 		this.stoneGroup = null; // 棋子
 		this.highlightGroup = null; // 获胜连线
-		this.ghost = null; // 悬停预览
+		this.axisGroup = null; // +x/+y/+z 正方向指示
+		this.preview = null; // 输入坐标对应的落点预览
 		this.n = 4;
 		this.cellSize = 1;
 		this.gap = CELL_GAP;
 		this.showGrid = true;
+		this.showAxes = true;
 		this.stones = {}; // "x,y,z" -> mesh
-		this.raycaster = null;
-		this.pointer = { x: 0, y: 0, clientX: 0, clientY: 0, inside: false };
 		this.sphere = null; // 旋转用包围球
-		this.onPick = null; // 点击回调 (x,y,z)
-		this.enabled = false;
+		this.enabled = false; // 是否轮到本人（决定预览是否显示）
 		this.animId = null;
 		this._drag = null;
+		this._previewCell = null;
 		this._bind();
 	}
 
 	Board3D.prototype._bind = function () {
 		var self = this;
 
+		// 画布上只保留「拖拽旋转」。落子改由坐标输入完成，
+		// 因此不再有任何形式的点击拾取。
 		this.canvas.addEventListener('pointerdown', function (e) {
 			if (!self.renderer) return;
-			self._drag = { x: e.clientX, y: e.clientY, moved: false, t: Date.now() };
+			self._drag = { x: e.clientX, y: e.clientY, moved: false };
 			try {
 				self.canvas.setPointerCapture(e.pointerId);
 			} catch (err) {
@@ -165,39 +186,29 @@
 		});
 
 		this.canvas.addEventListener('pointermove', function (e) {
-			self._updatePointer(e);
-			if (self._drag && self.renderer) {
-				var dx = e.clientX - self._drag.x;
-				var dy = e.clientY - self._drag.y;
-				if (Math.abs(dx) > 3 || Math.abs(dy) > 3) self._drag.moved = true;
-				if (self._drag.moved) {
-					self._rotate(dx, dy);
-					self._drag.x = e.clientX;
-					self._drag.y = e.clientY;
-				}
+			if (!self._drag || !self.renderer) return;
+			var dx = e.clientX - self._drag.x;
+			var dy = e.clientY - self._drag.y;
+			if (Math.abs(dx) > 3 || Math.abs(dy) > 3) self._drag.moved = true;
+			if (self._drag.moved) {
+				self._rotate(dx, dy);
+				self._drag.x = e.clientX;
+				self._drag.y = e.clientY;
 			}
-			self._updateGhost();
 		});
 
 		function endDrag(e) {
 			if (!self._drag) return;
-			var wasClick = !self._drag.moved && Date.now() - self._drag.t < 600;
 			self._drag = null;
 			try {
 				self.canvas.releasePointerCapture(e.pointerId);
 			} catch (err) {
 				/* ignore */
 			}
-			if (wasClick) self._handleClick();
 		}
 		this.canvas.addEventListener('pointerup', endDrag);
 		this.canvas.addEventListener('pointercancel', function () {
 			self._drag = null;
-		});
-
-		this.canvas.addEventListener('pointerleave', function () {
-			self.pointer.inside = false;
-			self._hideGhost();
 		});
 
 		this.canvas.addEventListener(
@@ -216,19 +227,6 @@
 			},
 			{ passive: false }
 		);
-	};
-
-	Board3D.prototype._updatePointer = function (e) {
-		var rect = this.canvas.getBoundingClientRect();
-		this.pointer.clientX = e.clientX;
-		this.pointer.clientY = e.clientY;
-		this.pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-		this.pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-		this.pointer.inside =
-			e.clientX >= rect.left &&
-			e.clientX <= rect.right &&
-			e.clientY >= rect.top &&
-			e.clientY <= rect.bottom;
 	};
 
 	Board3D.prototype._rotate = function (dx, dy) {
@@ -257,18 +255,6 @@
 		var s = this.cellSize;
 		var off = ((n - 1) * s) / 2;
 		return [x * s - off, y * s - off, z * s - off];
-	};
-
-	/** 世界坐标反推格子坐标（用于拾取兜底） */
-	Board3D.prototype.worldToCell = function (p) {
-		var n = this.n;
-		var s = this.cellSize;
-		var off = ((n - 1) * s) / 2;
-		var x = Math.round((p.x + off) / s);
-		var y = Math.round((p.y + off) / s);
-		var z = Math.round((p.z + off) / s);
-		if (x < 0 || x >= n || y < 0 || y >= n || z < 0 || z >= n) return null;
-		return [x, y, z];
 	};
 
 	Board3D.prototype.init = function (n) {
@@ -316,7 +302,6 @@
 
 	Board3D.prototype._buildBoard = function () {
 		var THREE = window.THREE;
-		var self = this;
 		var n = this.n;
 
 		if (this.cellGroup) this.scene.remove(this.cellGroup);
@@ -327,6 +312,9 @@
 		this.stoneGroup = new THREE.Group();
 		this.highlightGroup = new THREE.Group();
 		this.stones = {};
+		// 重建棋盘时旧棋子会被移出场景，落子动画队列必须一并清空，
+		// 否则 _tickAnimations 会继续驱动已脱离场景的 mesh。
+		this._animating = [];
 
 		// ---- 格线（线框立方网格）----
 		var half = (n - 1) / 2;
@@ -375,29 +363,88 @@
 
 		// 复用几何体：棋子是球体，半径略小于半格
 		this._stoneGeo = this._stoneGeo || new THREE.SphereGeometry(1, 20, 14);
-		this._pickGeo = this._pickGeo || new THREE.SphereGeometry(1, 16, 12);
 
 		this.sphere = new THREE.Sphere(Math.max(2, n * 0.9));
-		this._syncGrid();
-		void self;
+		this._syncPreview();
+		this._buildAxes();
 	};
 
-	Board3D.prototype._syncGrid = function () {
-		if (!this.ghost) {
-			var THREE = window.THREE;
-			this.ghost = new THREE.Mesh(
-				new THREE.SphereGeometry(1, 16, 12),
-				new THREE.MeshBasicMaterial({
-					color: 0xffffff,
-					transparent: true,
-					opacity: 0.22
-				})
+	/** 落点预览棋子（半透明），由坐标输入驱动，不再随鼠标悬停变化 */
+	Board3D.prototype._syncPreview = function () {
+		if (this.preview) return;
+		var THREE = window.THREE;
+		this.preview = new THREE.Mesh(
+			new THREE.SphereGeometry(1, 16, 12),
+			new THREE.MeshBasicMaterial({
+				color: 0xffffff,
+				transparent: true,
+				opacity: 0.22
+			})
+		);
+		this.preview.visible = false;
+		this.scene.add(this.preview);
+	};
+
+	/**
+	 * x/y/z 正方向指示：从棋盘的最小角向外伸出三支箭头，末端带 +x/+y/+z 标签。
+	 * 三维投影下光看格线无法判断坐标正方向，这是坐标落子的必要前提。
+	 */
+	Board3D.prototype._buildAxes = function () {
+		var THREE = window.THREE;
+		if (this.axisGroup) this.scene.remove(this.axisGroup);
+
+		var n = this.n;
+		var half = (n - 1) / 2;
+		var lo = -half - 0.5; // 与格线外框一致的最小角
+		var origin = new THREE.Vector3(lo, lo, lo);
+		var len = Math.max(1.6, n * 0.5);
+		var self = this;
+
+		var group = new THREE.Group();
+		axes().forEach(function (axis) {
+			var dir = new THREE.Vector3(
+				axis.vector[0],
+				axis.vector[1],
+				axis.vector[2]
 			);
-			this.ghost.visible = false;
-			this._ghostReady = true;
-			this.scene.add(this.ghost);
-			void THREE;
-		}
+			group.add(
+				new THREE.ArrowHelper(dir, origin, len, hexToInt(axis.color), 0.5, 0.26)
+			);
+			var label = self._axisLabel(axis.label, axis.color);
+			label.position.copy(origin).addScaledVector(dir, len + 0.45);
+			group.add(label);
+		});
+
+		group.visible = this.showAxes;
+		this.axisGroup = group;
+		this.scene.add(group);
+	};
+
+	/** 用 canvas 画一张文字贴图做轴标签，避免额外引入字体加载器 */
+	Board3D.prototype._axisLabel = function (text, cssColor) {
+		var THREE = window.THREE;
+		var canvas = document.createElement('canvas');
+		canvas.width = 96;
+		canvas.height = 64;
+		var ctx = canvas.getContext('2d');
+		ctx.font = 'bold 44px -apple-system, "Segoe UI", sans-serif';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillStyle = cssColor;
+		ctx.fillText(text, 48, 34);
+
+		var texture = new THREE.CanvasTexture(canvas);
+		texture.minFilter = THREE.LinearFilter;
+		var sprite = new THREE.Sprite(
+			new THREE.SpriteMaterial({
+				map: texture,
+				transparent: true,
+				// 轴标签要始终可读，不参与深度遮挡
+				depthTest: false
+			})
+		);
+		sprite.scale.set(0.85, 0.57, 1);
+		return sprite;
 	};
 
 	Board3D.prototype.setGridVisible = function (visible) {
@@ -405,9 +452,37 @@
 		if (this.cellGroup) this.cellGroup.visible = this.showGrid;
 	};
 
+	Board3D.prototype.setAxesVisible = function (visible) {
+		this.showAxes = !!visible;
+		if (this.axisGroup) this.axisGroup.visible = this.showAxes;
+	};
+
+	/** 该格是否已有棋子 */
+	Board3D.prototype.hasStone = function (cell) {
+		return !!(cell && this.stones[cell.join(',')]);
+	};
+
+	/** 把预览棋子放到指定格子；传 null、非本人回合或该格已有子时隐藏 */
+	Board3D.prototype.setPreview = function (cell) {
+		if (!this.preview || !this.enabled || !cell || this.hasStone(cell)) {
+			this.clearPreview();
+			return;
+		}
+		var w = this.cellToWorld(cell[0], cell[1], cell[2]);
+		var radius = (this.cellSize / 2) * (1 - this.gap);
+		this.preview.position.set(w[0], w[1], w[2]);
+		this.preview.scale.setScalar(radius * 1.05);
+		this.preview.visible = true;
+		this._previewCell = cell;
+	};
+
+	Board3D.prototype.clearPreview = function () {
+		if (this.preview) this.preview.visible = false;
+		this._previewCell = null;
+	};
+
 	/** 全量刷新棋子（服务端每次广播都带完整棋盘，避免增量不同步） */
 	Board3D.prototype.sync = function (state) {
-		var THREE = window.THREE;
 		var self = this;
 		var n = state.n;
 		if (n !== this.n) {
@@ -445,6 +520,10 @@
 		});
 
 		this.syncHighlight(state);
+
+		// 局面变化后落点可能已被占用（例如对手抢先占了这一格），需要重算预览
+		var keep = this._previewCell;
+		if (keep) this.setPreview(keep);
 	};
 
 	Board3D.prototype._addStone = function (x, y, z, player, animateFrom) {
@@ -529,107 +608,9 @@
 		this.highlightGroup.add(line);
 	};
 
-	/** 悬停时在目标格显示半透明预览 */
-	Board3D.prototype._updateGhost = function () {
-		if (!this.ghost || !this.enabled || !this.pointer.inside) {
-			this._hideGhost();
-			return;
-		}
-		var cell = this.pick();
-		if (!cell) {
-			this._hideGhost();
-			return;
-		}
-		var key = cell[0] + ',' + cell[1] + ',' + cell[2];
-		// 已有子的格子不预览
-		if (this.stones[key]) {
-			this._hideGhost();
-			return;
-		}
-		var w = this.cellToWorld(cell[0], cell[1], cell[2]);
-		var radius = (this.cellSize / 2) * (1 - this.gap);
-		this.ghost.position.set(w[0], w[1], w[2]);
-		this.ghost.scale.setScalar(radius * 1.05);
-		this.ghost.visible = true;
-		this._ghostCell = cell;
-	};
-
-	Board3D.prototype._hideGhost = function () {
-		if (this.ghost) this.ghost.visible = false;
-		this._ghostCell = null;
-	};
-
-	/**
-	 * 拾取：优先命中已有棋子的包围球球心；否则用「射线与格心最近的交点」判定。
-	 * 做法是把 n³ 个格心投影到屏幕，取离鼠标最近且在阈值内的那个，
-	 * 这样即使网格隐藏（无可见几何体）也能正常拾取。
-	 */
-	Board3D.prototype.pick = function () {
-		if (!this.camera || !this.renderer) return null;
-		var n = this.n;
-		var rect = this.canvas.getBoundingClientRect();
-		if (!rect.width || !rect.height) return null;
-
-		var mx = this.pointer.clientX - rect.left;
-		var my = this.pointer.clientY - rect.top;
-
-		var v = new window.THREE.Vector3();
-		var best = null;
-		var bestDist = Infinity;
-		var bestDepth = Infinity;
-
-		// 阈值按格宽在屏幕上的投影估算
-		var probe = new window.THREE.Vector3();
-		var w0 = this.cellToWorld(0, 0, 0);
-		var w1 = this.cellToWorld(1, 0, 0);
-		probe.set(w0[0], w0[1], w0[2]);
-		probe.project(this.camera);
-		var sx0 = ((probe.x + 1) / 2) * rect.width;
-		var sy0 = ((1 - probe.y) / 2) * rect.height;
-		probe.set(w1[0], w1[1], w1[2]);
-		probe.project(this.camera);
-		var sx1 = ((probe.x + 1) / 2) * rect.width;
-		var sy1 = ((1 - probe.y) / 2) * rect.height;
-		var cellPx = Math.sqrt(
-			(sx1 - sx0) * (sx1 - sx0) + (sy1 - sy0) * (sy1 - sy0)
-		);
-		var threshold = Math.max(6, cellPx * 0.62);
-
-		for (var x = 0; x < n; x++) {
-			for (var y = 0; y < n; y++) {
-				for (var z = 0; z < n; z++) {
-					var w = this.cellToWorld(x, y, z);
-					v.set(w[0], w[1], w[2]);
-					var depth = v.distanceTo(this.camera.position);
-					v.project(this.camera);
-					if (v.z < -1 || v.z > 1) continue;
-					var sx = ((v.x + 1) / 2) * rect.width;
-					var sy = ((1 - v.y) / 2) * rect.height;
-					var d = Math.sqrt((sx - mx) * (sx - mx) + (sy - my) * (sy - my));
-					if (d > threshold) continue;
-					// 同分时选离相机更近的（前层优先，符合直觉）
-					if (d < bestDist - 1 || (Math.abs(d - bestDist) <= 1 && depth < bestDepth)) {
-						bestDist = d;
-						bestDepth = depth;
-						best = [x, y, z];
-					}
-				}
-			}
-		}
-		return best;
-	};
-
-	Board3D.prototype._handleClick = function () {
-		if (!this.enabled || !this.onPick) return;
-		var cell = this._ghostCell || this.pick();
-		if (!cell) return;
-		var key = cell[0] + ',' + cell[1] + ',' + cell[2];
-		if (this.stones[key]) return; // 已占用
-		this.onPick(cell[0], cell[1], cell[2]);
-	};
-
 	Board3D.prototype._reapplyGrid = function () {
 		if (this.cellGroup) this.cellGroup.visible = this.showGrid;
+		if (this.axisGroup) this.axisGroup.visible = this.showAxes;
 		if (this._lastState) this.sync(this._lastState);
 	};
 
@@ -654,10 +635,10 @@
 		function frame() {
 			self.animId = requestAnimationFrame(frame);
 			self._tickAnimations();
-			if (self.ghost && self.ghost.visible) {
+			if (self.preview && self.preview.visible) {
 				var t = performance.now() * 0.0035;
-				self.ghost.material.opacity = 0.16 + Math.sin(t) * 0.07;
-				self.ghost.rotation.y += 0.01;
+				self.preview.material.opacity = 0.16 + Math.sin(t) * 0.07;
+				self.preview.rotation.y += 0.01;
 			}
 			if (self.highlightGroup) {
 				self.highlightGroup.children.forEach(function (c) {
@@ -702,7 +683,7 @@
 
 	Board3D.prototype.setEnabled = function (on) {
 		this.enabled = !!on;
-		if (!this.enabled) this._hideGhost();
+		if (!this.enabled) this.clearPreview();
 	};
 
 	/* ==================================================================
@@ -719,20 +700,22 @@
 		this.timerId = null;
 		this.lobbyMsg = null;
 		this.arenaMsg = null;
+		this.suppressReconnect = false;
+		// 坐标输入区
+		this.moveForm = null;
+		this.coordInputs = null;
+		this.moveBtn = null;
+		this.moveHint = null;
+		this.lastSubmitted = null;
 	}
 
 	App.prototype.msg = function (text, kind) {
-		var el = this.lobbyMsg && !this.lobbyMsg.closest('section').hidden
-			? this.lobbyMsg
-			: this.arenaMsg;
-		if (!el) return;
-		// 两个区域都可能可见，优先显示当前所在区域的提示
+		// 两个区域都可能存在，优先显示当前所在区域的提示
 		var target = this.room ? this.arenaMsg : this.lobbyMsg;
 		if (!target) return;
 		target.textContent = text || '';
 		target.classList.toggle('is-shown', !!text);
 		target.classList.toggle('is-info', kind === 'info');
-		void el;
 	};
 
 	App.prototype.init = function () {
@@ -741,12 +724,10 @@
 		this.arenaMsg = $('#arena-msg');
 
 		this.board = new Board3D($('#canvas3d'));
-		this.board.onPick = function (x, y, z) {
-			self.onPick(x, y, z);
-		};
 
 		this.bindLobby();
 		this.bindArena();
+		this.bindMoveForm();
 		this.bindNet();
 
 		window.addEventListener('resize', function () {
@@ -844,6 +825,190 @@
 		});
 	};
 
+	/**
+	 * 坐标输入落子。
+	 * 客户端只拦截「明显非法」的情况（格式、范围、占用、回合），
+	 * 最终裁决仍在服务端 —— 双方各按一套规则是联机对战的经典坑。
+	 */
+	App.prototype.bindMoveForm = function () {
+		var self = this;
+		this.moveForm = $('#move-form');
+		this.moveBtn = $('#btn-move');
+		this.moveHint = $('#coord-hint');
+		this.coordInputs = [$('#coord-x'), $('#coord-y'), $('#coord-z')];
+
+		if (!this.moveForm || !this.coordInputs[0]) return;
+
+		this.moveForm.addEventListener('submit', function (e) {
+			e.preventDefault();
+			self.submitMove();
+		});
+
+		this.coordInputs.forEach(function (input, index) {
+			input.addEventListener('input', function () {
+				var n = self.boardN();
+				var digits = String(Math.max(0, n - 1)).length;
+				var cleaned = input.value.replace(/\D/g, '').slice(0, digits);
+				if (cleaned !== input.value) input.value = cleaned;
+				// 这一位已经填满且合法就自动跳到下一格，省一次点击；
+				// 不合法（例如 4³ 棋盘里输了 9）就留在原地，让玩家看到提示。
+				var valid = window.Gomoku3DRules.parseCoord(cleaned, n) !== null;
+				if (valid && cleaned.length >= digits && index < 2) {
+					self.coordInputs[index + 1].focus();
+				}
+				self.refreshPreview();
+			});
+			input.addEventListener('focus', function () {
+				input.select();
+			});
+		});
+	};
+
+	/** 当前棋盘边长（开局前用大厅的设定值兜底） */
+	App.prototype.boardN = function () {
+		if (this.state && this.state.n) return this.state.n;
+		if (this.board && this.board.n) return this.board.n;
+		return this.n;
+	};
+
+	/** 读取输入框里的坐标；不合法时返回 { ok:false, error } */
+	App.prototype.readCoords = function () {
+		var n = this.boardN();
+		var Rules = window.Gomoku3DRules;
+		var cell = [];
+		for (var i = 0; i < 3; i++) {
+			var input = this.coordInputs[i];
+			var raw = input ? input.value : '';
+			if (String(raw).trim() === '') {
+				return { ok: false, error: '请填写 x、y、z 三个坐标' };
+			}
+			var v = Rules.parseCoord(raw, n);
+			if (v === null) {
+				return {
+					ok: false,
+					error: (input ? input.id.slice(-1) : '?') + ' 需要 0–' + (n - 1) + ' 的整数'
+				};
+			}
+			cell.push(v);
+		}
+		return { ok: true, cell: cell };
+	};
+
+	App.prototype.setMoveHint = function (text, kind) {
+		if (!this.moveHint) return;
+		this.moveHint.textContent = text || '';
+		this.moveHint.classList.toggle('is-shown', !!text);
+		this.moveHint.classList.toggle('is-error', kind === 'error');
+		this.moveHint.classList.toggle('is-ok', kind === 'ok');
+	};
+
+	/** 依据输入框内容刷新落点预览与提示 */
+	App.prototype.refreshPreview = function () {
+		var s = this.state;
+		if (!s || s.status !== 'playing') {
+			this.board.clearPreview();
+			return;
+		}
+		if (s.turn !== this.myPlayer) {
+			this.board.clearPreview();
+			this.setMoveHint('等待对手落子…', 'info');
+			return;
+		}
+		var res = this.readCoords();
+		if (!res.ok) {
+			this.board.clearPreview();
+			this.setMoveHint(res.error, 'error');
+			return;
+		}
+		var key = window.Gomoku3DRules.formatCoord(res.cell[0], res.cell[1], res.cell[2]);
+		if (this.board.hasStone(res.cell)) {
+			this.board.clearPreview();
+			this.setMoveHint('(' + key + ') 已有棋子', 'error');
+			return;
+		}
+		this.board.setPreview(res.cell);
+		this.setMoveHint('将落在 (' + key + ')', 'ok');
+	};
+
+	App.prototype.clearCoords = function (focus) {
+		if (!this.coordInputs) return;
+		for (var i = 0; i < 3; i++) this.coordInputs[i].value = '';
+		if (this.board) this.board.clearPreview();
+		if (focus) this.coordInputs[0].focus();
+	};
+
+	App.prototype.submitMove = function () {
+		var s = this.state;
+		if (!s || s.status !== 'playing') {
+			this.setMoveHint('对局未在进行中', 'error');
+			return;
+		}
+		if (s.turn !== this.myPlayer) {
+			this.setMoveHint('还没轮到你', 'error');
+			return;
+		}
+		var res = this.readCoords();
+		if (!res.ok) {
+			this.setMoveHint(res.error, 'error');
+			return;
+		}
+		var key = window.Gomoku3DRules.formatCoord(res.cell[0], res.cell[1], res.cell[2]);
+		if (this.board.hasStone(res.cell)) {
+			this.setMoveHint('(' + key + ') 已有棋子', 'error');
+			return;
+		}
+		this.lastSubmitted = res.cell;
+		this.net.send({ type: 'move', x: res.cell[0], y: res.cell[1], z: res.cell[2] });
+		this.clearCoords(true);
+		this.setMoveHint('已提交 (' + key + ')，等待服务端确认…', 'info');
+	};
+
+	/** 服务端拒绝落子时把坐标填回输入框，省得玩家重敲 */
+	App.prototype.restoreSubmitted = function () {
+		if (!this.lastSubmitted || !this.coordInputs) return;
+		var cell = this.lastSubmitted;
+		this.lastSubmitted = null;
+		for (var i = 0; i < 3; i++) this.coordInputs[i].value = String(cell[i]);
+		this.refreshPreview();
+	};
+
+	/** 依据局面启停输入区，并在轮到自己时刷新预览 */
+	App.prototype.updateMoveForm = function (s) {
+		if (!this.coordInputs) return;
+		var n = s && s.n ? s.n : this.boardN();
+		var digits = String(Math.max(0, n - 1)).length;
+		this.coordInputs.forEach(function (input) {
+			input.maxLength = digits;
+			input.placeholder = '0-' + (n - 1);
+		});
+
+		var playing = !!s && s.status === 'playing';
+		var myTurn = playing && s.turn === this.myPlayer;
+
+		this.board.setEnabled(myTurn);
+		for (var i = 0; i < 3; i++) this.coordInputs[i].disabled = !myTurn;
+		if (this.moveBtn) this.moveBtn.disabled = !myTurn;
+		if (this.moveForm) this.moveForm.classList.toggle('is-locked', !myTurn);
+
+		if (myTurn) {
+			this.refreshPreview();
+		} else {
+			this.board.clearPreview();
+			this.setMoveHint(playing ? '等待对手落子…' : '', 'info');
+		}
+	};
+
+	App.prototype.updateLastMove = function (s) {
+		var el = $('#hud-last');
+		if (!el) return;
+		var mv = s && s.lastMove;
+		if (!mv) {
+			el.textContent = '';
+			return;
+		}
+		el.textContent = '上一手 (' + mv.x + ',' + mv.y + ',' + mv.z + ') · 玩家 ' + mv.player;
+	};
+
 	App.prototype.bindNet = function () {
 		var self = this;
 
@@ -872,19 +1037,24 @@
 
 		this.net.on('error', function (msg) {
 			self.msg(msg.message || '出错了');
-			self.toast(msg.message || '出错了');
+			// 落子被服务端拒绝时，把坐标填回输入框
+			self.restoreSubmitted();
 		});
 
 		this.net.on('kicked', function (msg) {
-			self.toast(msg.message || '连接被接管');
+			// 座位已被别处接管。若还走 close 里的自动重连，就会把对方踢下线，
+			// 对方再重连又踢回来，形成无休止的互相抢座。这里直接退回大厅。
+			self.suppressReconnect = true;
+			self.backToLobby();
+			self.msg(msg.message || '座位已在别处重新连接', 'info');
 		});
 
 		this.net.on('close', function () {
-			if (self.room) {
+			if (self.room && !self.suppressReconnect) {
 				self.toast('连接已断开，正在尝试重连…');
 				// 自动重连：服务端按 token 恢复座位
 				setTimeout(function () {
-					if (!self.room) return;
+					if (!self.room || self.suppressReconnect) return;
 					self.net
 						.connect()
 						.then(function () {
@@ -914,6 +1084,7 @@
 
 	App.prototype.create = function (n, m, name) {
 		var self = this;
+		this.suppressReconnect = false;
 		this.msg('');
 		this.net
 			.connect()
@@ -927,6 +1098,7 @@
 
 	App.prototype.join = function (code, name) {
 		var self = this;
+		this.suppressReconnect = false;
 		this.msg('');
 		this.net
 			.connect()
@@ -952,8 +1124,8 @@
 
 		this.board.init(n);
 		this.board.resetView();
-		this.board.setEnabled(false); // 开局前不可落子
 		this.applyState({ n: n, m: m, board: [], status: 'waiting', turn: 1 });
+		this.clearCoords(false);
 	};
 
 	App.prototype.backToLobby = function () {
@@ -961,10 +1133,13 @@
 		this.room = null;
 		this.state = null;
 		this.myPlayer = 0;
+		this.lastSubmitted = null;
 		$('#arena').hidden = true;
 		$('#lobby').hidden = false;
 		$('#overlay').hidden = true;
 		if (location.hash) location.hash = '';
+		this.clearCoords(false);
+		this.setMoveHint('');
 		this.msg('', 'info');
 	};
 
@@ -979,11 +1154,12 @@
 		// 提示条：有过操作后淡出
 		if (s.moveCount > 0) $('#stage-tip').classList.add('is-hidden');
 
-		var playing = s.status === 'playing';
-		var myTurn = playing && s.turn === this.myPlayer;
-		board.setEnabled(myTurn);
+		// 新局面前后，上一次提交无论成败都已结算
+		this.lastSubmitted = null;
 
 		this.updateHud(s);
+		this.updateLastMove(s);
+		this.updateMoveForm(s);
 		this.updateOverlay(s);
 		this.updateTimer(s);
 	};
@@ -1053,34 +1229,26 @@
 		if (s.status !== 'playing' || !s.turnRemainMs) {
 			if (s.status === 'playing' && s.graceRemainMs > 0) {
 				el.textContent = '对方掉线 ' + Math.ceil(s.graceRemainMs / 1000) + 's';
+			} else {
+				el.textContent = '';
 			}
 			return;
 		}
+		// tick 是被 setInterval 以普通函数方式调用的，严格模式下 this 为 undefined，
+		// 所以必须走闭包 self，不能写 this.timerId。
+		var self = this;
 		var base = s.turnRemainMs;
 		var t0 = Date.now();
 		function tick() {
 			var left = Math.max(0, base - (Date.now() - t0));
 			el.textContent = Math.ceil(left / 1000) + 's';
-			if (left <= 0 && this.timerId) {
-				clearInterval(this.timerId);
-				this.timerId = null;
+			if (left <= 0 && self.timerId) {
+				clearInterval(self.timerId);
+				self.timerId = null;
 			}
 		}
-		tick();
-		var self = this;
 		this.timerId = setInterval(tick, 250);
-		void self;
-	};
-
-	App.prototype.onPick = function (x, y, z) {
-		var s = this.state;
-		if (!s || s.status !== 'playing') return;
-		if (s.turn !== this.myPlayer) {
-			this.toast('还没轮到你');
-			return;
-		}
-		// 乐观本地反馈：先画上半透明子弹，等广播覆盖
-		this.net.send({ type: 'move', x: x, y: y, z: z });
+		tick();
 	};
 
 	document.addEventListener('DOMContentLoaded', function () {

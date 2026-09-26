@@ -240,14 +240,115 @@ async function main () {
 	ok('房间不存在被拒', (await c.wait('error')).message.indexOf('不存在') >= 0)
 	c.close()
 
-	/* ---------- 11. 非法配置 ---------- */
-	const d = client(port)
-	await d.open()
-	d.send({ type: 'create', n: 5, m: 9 })
-	ok('M 大于 N 被拒', (await d.wait('error')).message.indexOf('M') >= 0)
-	d.close()
+/* ---------- 11. 非法配置 ---------- */
+const d = client(port)
+await d.open()
+d.send({ type: 'create', n: 5, m: 9 })
+ok('M 大于 N 被拒', (await d.wait('error')).message.indexOf('M') >= 0)
+d.close()
 
-	a2.close()
+/* ---------- 12. 单步超时判负必须广播 ---------- */
+// 超时是服务端单方面触发的，若不广播，对手端会永远停在「等待对方」。
+game.TIMEOUTS.turn = 400
+const e1 = client(port)
+await e1.open()
+e1.send({ type: 'create', n: 4, m: 4, name: '超时甲' })
+const created2 = await e1.wait('created')
+const e2 = client(port)
+await e2.open()
+e2.send({ type: 'join', room: created2.room, name: '超时乙' })
+await e2.wait('joined')
+await e1.wait('state')
+e1.drain()
+e2.drain()
+
+async function waitFinished (c, budgetMs) {
+	const deadline = Date.now() + budgetMs
+	while (Date.now() < deadline) {
+		const s = await c.wait('state', budgetMs)
+		if (s.status === 'finished') return s
+	}
+	return null
+}
+
+const timeoutA = await waitFinished(e1, 4000)
+ok('单步超时会广播终局状态', !!timeoutA)
+ok('超时判负：reason=timeout', !!timeoutA && timeoutA.reason === 'timeout')
+ok('超时判负：获胜方为对手', !!timeoutA && timeoutA.winner === 2)
+const timeoutB = await waitFinished(e2, 4000)
+ok('对手同样收到超时终局广播', !!timeoutB && timeoutB.reason === 'timeout')
+ok('超时后服务端停止计时', !!timeoutA && timeoutA.turnRemainMs === 0)
+e1.close()
+e2.close()
+
+/* ---------- 13. 掉线宽限按座位隔离 ---------- */
+// 一方掉线后，另一方断线重连不应顺带取消前者的宽限倒计时。
+game.TIMEOUTS.turn = 60 * 1000 // 拉长回合时限，避免干扰本段
+const f1 = client(port)
+await f1.open()
+f1.send({ type: 'create', n: 4, m: 4, name: '宽限甲' })
+const created3 = await f1.wait('created')
+const f2 = client(port)
+await f2.open()
+f2.send({ type: 'join', room: created3.room, name: '宽限乙' })
+const joined2 = await f2.wait('joined')
+await f1.wait('state')
+await f2.wait('state')
+f1.drain()
+f2.drain()
+
+f1.close()
+let dropped = null
+{
+	const deadline = Date.now() + 5000
+	while (Date.now() < deadline) {
+		const s = await f2.wait('state', 5000)
+		if (s.seats[0] && s.seats[0].connected === false) {
+			dropped = s
+			break
+		}
+	}
+}
+ok('掉线方进入宽限倒计时', !!dropped && dropped.graceRemainMs > 0)
+
+f2.close()
+const f2b = client(port)
+await f2b.open()
+f2b.send({ type: 'join', room: created3.room, token: joined2.token, name: '宽限乙' })
+const rejoin2 = await f2b.wait('joined')
+ok('重连方回到原座位', rejoin2.seat === 1 && rejoin2.reconnect === true)
+const afterRejoin = await f2b.wait('state')
+ok('重连后自己恢复在线', afterRejoin.seats[1].connected === true)
+ok(
+	'重连不误清对手的宽限倒计时',
+	afterRejoin.seats[0].connected === false && afterRejoin.graceRemainMs > 0
+)
+f2b.close()
+
+/* ---------- 14. 掉线宽限超时判负必须广播 ---------- */
+game.TIMEOUTS.grace = 400
+const g1 = client(port)
+await g1.open()
+g1.send({ type: 'create', n: 4, m: 4, name: '宽限甲2' })
+const created4 = await g1.wait('created')
+const g2 = client(port)
+await g2.open()
+g2.send({ type: 'join', room: created4.room, name: '宽限乙2' })
+await g2.wait('joined')
+await g1.wait('state')
+g1.drain()
+g2.close() // 座位 1 掉线，宽限 400ms 后判负
+
+const graceState = await waitFinished(g1, 4000)
+ok('掉线宽限超时会广播终局状态', !!graceState)
+ok('掉线宽限超时：reason=disconnect', !!graceState && graceState.reason === 'disconnect')
+ok('掉线宽限超时：留守方获胜', !!graceState && graceState.winner === 1)
+g1.close()
+
+game.TIMEOUTS.turn = 120 * 1000
+game.TIMEOUTS.grace = 60 * 1000
+
+a2.close()
 	b.close()
 	await delay(100)
 	server.close()
