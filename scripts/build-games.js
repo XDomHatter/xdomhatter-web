@@ -70,7 +70,7 @@ function buildGomoku3D (cssInline) {
 		console.warn('[games] 未找到 dist/js/game3d.js，回退为外链（请先执行 gulp js）')
 	}
 	const rulesInline = readAsset('js/gomoku3d-rules.js', '</script')
-	if (!rulesInline) {
+	if (!rulesInline)	 {
 		console.warn(
 			'[games] 未找到 dist/js/gomoku3d-rules.js，回退为外链（请先执行 gulp js）'
 		)
