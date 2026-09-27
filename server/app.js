@@ -12,6 +12,7 @@ const matter = require('gray-matter')
 const render = require('../lib/render')
 const Rules = require('../lib/gomoku3d-rules')
 const store = require('./store')
+const comments = require('./comments')
 const gameServer = require('./gomoku3d')
 
 const ROOT = render.ROOT
@@ -21,6 +22,9 @@ const blogConf = config.blog || {}
 const SITE_URL = String(blogConf.url || '').replace(/\/+$/, '')
 const BLOG_TITLE = blogConf.title || 'Blog'
 const BLOG_DESC = blogConf.description || config.head.description || ''
+
+// 评论开关：config.json 的 blog.comments 为 false 时整体下线（模板不渲染评论区）
+const COMMENTS_ON = blogConf.comments !== false
 
 const ADMIN_TOKEN = process.env.BLOG_ADMIN_TOKEN || ''
 const PORT = Number(process.env.XDHPAGE_PORT || 80)
@@ -195,6 +199,14 @@ app.get('/blog/posts/:slug', function (req, res, next) {
 				tags: tags.list,
 				math: true,
 				post: post,
+				// 评论服务端渲染：首屏即有内容，不依赖 JS 也能读到；
+				// submitUrl 为空表示静态产物，前端提交时会给出明确提示。
+				commentsOn: COMMENTS_ON,
+				comments: COMMENTS_ON
+					? comments.listBySlug(post.slug).map(comments.publicComment)
+					: [],
+				commentCount: COMMENTS_ON ? comments.listBySlug(post.slug).length : 0,
+				submitUrl: '/api/comments/' + encodeURIComponent(post.slug),
 				title: post.title + ' · ' + BLOG_TITLE,
 				description: post.summary
 			})
@@ -300,6 +312,71 @@ app.post('/api/preview', requireToken, function (req, res) {
 	res.json({ html: store.renderPreview((req.body || {}).content) })
 })
 
+/* ---------------- 评论接口 ---------------- */
+
+function clientIp (req) {
+	// 反代场景下取第一个 X-Forwarded-For 条目；本地直连则用 socket 地址。
+	const forwarded = req.get('x-forwarded-for')
+	if (forwarded) return forwarded.split(',')[0].trim()
+	return (req.socket && (req.socket.remoteAddress || '')) || ''
+}
+
+/** 公开读：只返回已通过审核的评论，不含邮箱与 IP */
+app.get('/api/comments/:slug', function (req, res) {
+	if (!COMMENTS_ON) return res.json({ comments: [], count: 0 })
+	const list = comments.listBySlug(req.params.slug)
+	res.json({
+		comments: list.map(comments.publicComment),
+		count: list.length
+	})
+})
+
+/** 公开写：无需令牌，带节流与字段校验 */
+app.post('/api/comments/:slug', function (req, res) {
+	if (!COMMENTS_ON) {
+		return res.status(403).json({ error: '评论功能已关闭' })
+	}
+	try {
+		const created = comments.addComment(req.params.slug, req.body || {}, {
+			ip: clientIp(req)
+		})
+		// 先审后发时不能直接把内容回给前端（否则等于绕过审核）
+		const visible = created.approved !== false
+		res.status(201).json({
+			ok: true,
+			pending: !visible,
+			comment: visible ? comments.publicComment(created) : null,
+			message: visible ? '评论已发布' : '评论已提交，等待审核'
+		})
+	} catch (err) {
+		fail(res, err)
+	}
+})
+
+/* ---------------- 评论管理（复用令牌） ---------------- */
+
+app.get('/api/admin/comments', requireToken, function (req, res) {
+	const slug = req.query.slug ? String(req.query.slug) : ''
+	const list = slug ? comments.listBySlug(slug, { includePending: true }) : comments.allComments()
+	res.json({ comments: list.map(comments.adminComment), count: list.length })
+})
+
+app.post('/api/admin/comments/:id/approve', requireToken, function (req, res) {
+	try {
+		res.json({ ok: true, comment: comments.adminComment(comments.approveComment(req.params.id)) })
+	} catch (err) {
+		fail(res, err)
+	}
+})
+
+app.delete('/api/admin/comments/:id', requireToken, function (req, res) {
+	try {
+		res.json({ ok: true, comment: comments.adminComment(comments.deleteComment(req.params.id)) })
+	} catch (err) {
+		fail(res, err)
+	}
+})
+
 /* ---------------- 静态资源（放在最后，避免覆盖上面的动态路由） ---------------- */
 
 app.use(
@@ -327,6 +404,9 @@ if (require.main === module) {
 		console.log('[ws] 联机对局 ws://localhost:' + PORT + gameServer.PATH)
 		console.log('[timer] 计时器 /timer')
 		console.log('[blog] 文章目录 ' + store.POSTS_DIR)
+		if (COMMENTS_ON) {
+			console.log('[blog] 评论数据 ' + comments.COMMENTS_FILE)
+		}
 	})
 	gameServer.createGameServer(server)
 }

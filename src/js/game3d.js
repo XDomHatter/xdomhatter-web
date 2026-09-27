@@ -4,10 +4,21 @@
  * 职责划分：
  *   - 网络层只管收发与重连，不做任何裁决（规则以服务端为准）。
  *   - 渲染层用 three.js 把 N³ 格子画在屏幕正中央，支持拖拽旋转、滚轮缩放。
- *   - 交互层不提供点击落子：双方通过在输入框里填写 (x, y, z) 落子，
+ *   - 交互层不提供点击落子：双方通过坐标 spinner 调整 (x, y, z) 落子，
  *     坐标取值 0…N-1，正方向由棋盘角落的 +x/+y/+z 箭头标定。
  *     之所以不用点击，是因为三维投影下「看到的那一格」与「实际想落的那一格」
  *     会因遮挡而错位；坐标输入没有这个歧义。
+ *
+ * 坐标输入的实现约定（改动前请先读这段）：
+ *   - 页面上可见的是 spinner（上方读数值、左右两枚按钮增减），但真正的
+ *     「当前坐标」只保存在 App.coordValues 里，并镜像到视觉隐藏的
+ *     .game3d-coord-input —— 校验、回填、预览全部走这套 input，
+ *     与 UI 是按钮还是文本框无关，避免两套状态各说各话。
+ *   - 坐标达到边界后环绕（0 再减回到 N-1），这是有意的：N 常常只有 4，
+ *     夹取会让按钮在边界「失灵」，反方向绕大半圈才能到对侧。
+ *   - 默认值是 (0, 0, 0)，每手落子后回到默认值。
+ *   - 棋盘上有三类光环：获胜连线为白色、最后一手用落子方颜色常驻标出、
+ *     输入坐标命中已有棋子时琥珀色提示占用 —— 三类指示颜色互不混用。
  *
  * 依赖：three.js（CDN 全局 THREE）、页面内联的 Gomoku3DRules。
  */
@@ -18,7 +29,13 @@
 	var COLOR_P1 = 0xff6b6b; // 与 game3d.less 的 @p1 对应
 	var COLOR_P2 = 0x4fc3f7;
 	var COLOR_GRID = 0xffffff;
+	// 占用提示光环：琥珀色，与玩家红/蓝、获胜连线的白色都区分得开
+	var COLOR_MARK = 0xffd166;
 	var CELL_GAP = 0.12; // 棋子相对格宽的内缩，便于看清格线
+	var DEFAULT_COORD = 0; // 坐标 spinner 的默认值：三轴均为 0，即 (0, 0, 0)
+	// 长按连续步进的节奏：超过 HOLD_DELAY 后每 HOLD_REPEAT 走一步
+	var HOLD_DELAY_MS = 420;
+	var HOLD_REPEAT_MS = 90;
 
 	/**
 	 * 三个坐标轴的正方向（定义在 Gomoku3DRules.AXES，与页面图例、规则说明同源）。
@@ -154,6 +171,8 @@
 		this.cellGroup = null; // 格线
 		this.stoneGroup = null; // 棋子
 		this.highlightGroup = null; // 获胜连线
+		this.lastMoveGroup = null; // 最后一手指示
+		this.occupiedGroup = null; // 输入坐标命中已有棋子的占用提示
 		this.axisGroup = null; // +x/+y/+z 正方向指示
 		this.preview = null; // 输入坐标对应的落点预览
 		this.n = 4;
@@ -167,6 +186,14 @@
 		this.animId = null;
 		this._drag = null;
 		this._previewCell = null;
+		// 两类指示的「最近状态」在 THREE 守卫之前就要记录：
+		// 回归测试在无 three.js 的 DOM 桩里跑，靠这两个字段验证 App↔Board3D 契约
+		this._occupiedCell = null;
+		this._lastMove = null;
+		// 持久 halo 单例（仿 _syncPreview）：只改位置/颜色/可见性，
+		// 避免 spinner 高频步进时反复创建 geometry
+		this._occupiedHalo = null;
+		this._lastMoveHalo = null;
 		this._bind();
 	}
 
@@ -307,11 +334,20 @@
 		if (this.cellGroup) this.scene.remove(this.cellGroup);
 		if (this.stoneGroup) this.scene.remove(this.stoneGroup);
 		if (this.highlightGroup) this.scene.remove(this.highlightGroup);
+		if (this.lastMoveGroup) this.scene.remove(this.lastMoveGroup);
+		if (this.occupiedGroup) this.scene.remove(this.occupiedGroup);
 
 		this.cellGroup = new THREE.Group();
 		this.stoneGroup = new THREE.Group();
 		this.highlightGroup = new THREE.Group();
+		this.lastMoveGroup = new THREE.Group();
+		this.occupiedGroup = new THREE.Group();
 		this.stones = {};
+		// 重建棋盘时旧棋子已被移出场景，指示 halo 也随之作废，
+		// 必须一并重置，否则会拿着旧组的引用继续改不可见的 mesh
+		this._occupiedCell = null;
+		this._occupiedHalo = null;
+		this._lastMoveHalo = null;
 		// 重建棋盘时旧棋子会被移出场景，落子动画队列必须一并清空，
 		// 否则 _tickAnimations 会继续驱动已脱离场景的 mesh。
 		this._animating = [];
@@ -360,12 +396,15 @@
 		this.scene.add(this.cellGroup);
 		this.scene.add(this.stoneGroup);
 		this.scene.add(this.highlightGroup);
+		this.scene.add(this.lastMoveGroup);
+		this.scene.add(this.occupiedGroup);
 
 		// 复用几何体：棋子是球体，半径略小于半格
 		this._stoneGeo = this._stoneGeo || new THREE.SphereGeometry(1, 20, 14);
 
 		this.sphere = new THREE.Sphere(Math.max(2, n * 0.9));
 		this._syncPreview();
+		this._syncMarkers();
 		this._buildAxes();
 	};
 
@@ -383,6 +422,39 @@
 		);
 		this.preview.visible = false;
 		this.scene.add(this.preview);
+	};
+
+	/**
+	 * 两类指示各保留一个 halo 球（占用提示=琥珀、最后一手=按玩家着色），
+	 * 呼吸动画由 _loop 统一驱动。挂在各自独立组里，与获胜连线互不干扰。
+	 */
+	Board3D.prototype._syncMarkers = function () {
+		var THREE = window.THREE;
+		if (!THREE || !this.occupiedGroup || !this.lastMoveGroup) return;
+		if (!this._occupiedHalo) {
+			this._occupiedHalo = new THREE.Mesh(
+				new THREE.SphereGeometry(1, 16, 12),
+				new THREE.MeshBasicMaterial({
+					color: COLOR_MARK,
+					transparent: true,
+					opacity: 0.35
+				})
+			);
+			this._occupiedHalo.visible = false;
+			this.occupiedGroup.add(this._occupiedHalo);
+		}
+		if (!this._lastMoveHalo) {
+			this._lastMoveHalo = new THREE.Mesh(
+				new THREE.SphereGeometry(1, 16, 12),
+				new THREE.MeshBasicMaterial({
+					color: 0xffffff,
+					transparent: true,
+					opacity: 0.4
+				})
+			);
+			this._lastMoveHalo.visible = false;
+			this.lastMoveGroup.add(this._lastMoveHalo);
+		}
 	};
 
 	/**
@@ -481,6 +553,26 @@
 		this._previewCell = null;
 	};
 
+	/**
+	 * 输入坐标指向已有棋子时的占用提示：在该子外套琥珀色光环。
+	 * 传 null 清除。光环定位在格心（不跟随落子动画），只有该格真的
+	 * 有棋子时才显示 —— App 侧已在每次 refreshPreview 开头清除。
+	 */
+	Board3D.prototype.setOccupiedMark = function (cell) {
+		this._occupiedCell = cell || null;
+		if (!this._occupiedHalo) return;
+		var stone = cell && this.stones[cell.join(',')];
+		if (!stone) {
+			this._occupiedHalo.visible = false;
+			return;
+		}
+		var w = this.cellToWorld(cell[0], cell[1], cell[2]);
+		var radius = (this.cellSize / 2) * (1 - this.gap);
+		this._occupiedHalo.position.set(w[0], w[1], w[2]);
+		this._occupiedHalo.scale.setScalar(radius * 1.5);
+		this._occupiedHalo.visible = true;
+	};
+
 	/** 全量刷新棋子（服务端每次广播都带完整棋盘，避免增量不同步） */
 	Board3D.prototype.sync = function (state) {
 		var self = this;
@@ -520,6 +612,7 @@
 		});
 
 		this.syncHighlight(state);
+		this.syncLastMove(state);
 
 		// 局面变化后落点可能已被占用（例如对手抢先占了这一格），需要重算预览
 		var keep = this._previewCell;
@@ -608,6 +701,32 @@
 		this.highlightGroup.add(line);
 	};
 
+	/**
+	 * 最后一手指示：服务端快照里的 state.lastMove，用落子方颜色的光环常驻标出。
+	 * 重开一局时 lastMove 为 null，光环随之下隐；找不到对应棋子（理论上只在
+	 * 快照与棋盘短暂不一致的窗口）时同样隐藏，绝不离群发光。
+	 */
+	Board3D.prototype.syncLastMove = function (state) {
+		var mv = state && state.lastMove;
+		this._lastMove = mv || null;
+		if (!this._lastMoveHalo) return;
+		if (!mv) {
+			this._lastMoveHalo.visible = false;
+			return;
+		}
+		var stone = this.stones[mv.x + ',' + mv.y + ',' + mv.z];
+		if (!stone) {
+			this._lastMoveHalo.visible = false;
+			return;
+		}
+		var w = this.cellToWorld(mv.x, mv.y, mv.z);
+		var radius = (this.cellSize / 2) * (1 - this.gap);
+		this._lastMoveHalo.position.set(w[0], w[1], w[2]);
+		this._lastMoveHalo.scale.setScalar(radius * 1.45);
+		this._lastMoveHalo.material.color.setHex(mv.player === 1 ? COLOR_P1 : COLOR_P2);
+		this._lastMoveHalo.visible = true;
+	};
+
 	Board3D.prototype._reapplyGrid = function () {
 		if (this.cellGroup) this.cellGroup.visible = this.showGrid;
 		if (this.axisGroup) this.axisGroup.visible = this.showAxes;
@@ -640,14 +759,17 @@
 				self.preview.material.opacity = 0.16 + Math.sin(t) * 0.07;
 				self.preview.rotation.y += 0.01;
 			}
-			if (self.highlightGroup) {
-				self.highlightGroup.children.forEach(function (c) {
+			// 三个指示组共用同一套呼吸节奏：获胜连线（白）、占用提示（琥珀）、最后一手（玩家色）
+			var markerGroups = [self.highlightGroup, self.occupiedGroup, self.lastMoveGroup];
+			markerGroups.forEach(function (group) {
+				if (!group) return;
+				group.children.forEach(function (c) {
 					if (c.material && c.material.opacity !== undefined) {
 						c.material.opacity =
 							c.type === 'Line' ? 0.85 : 0.24 + Math.sin(performance.now() * 0.005) * 0.14;
 					}
 				});
-			}
+			});
 			if (self.renderer && self.scene && self.camera) {
 				self.renderer.render(self.scene, self.camera);
 			}
@@ -704,9 +826,19 @@
 		// 坐标输入区
 		this.moveForm = null;
 		this.coordInputs = null;
+		// 每个坐标的显示层（spinner 读数）与可点的上下键，与 coordInputs 一一对应
+		this.coordValues = null;
+		this.coordSteps = null;
 		this.moveBtn = null;
 		this.moveHint = null;
 		this.lastSubmitted = null;
+		this._holdTimer = null;
+		this._holdRepeat = null;
+		// 刚由 pointerdown 触发过、需要跳过其后续一次 click 的按钮（见 bindMoveForm）
+		this._suppressClickBtn = null;
+		// 拖动/长按期间要临时屏蔽预览刷新：连续步进会触发几十次刷新，
+		// 每次都要走一遍棋盘占用检查 + three.js 预览重算，纯属浪费。
+		this._dragging = false;
 	}
 
 	App.prototype.msg = function (text, kind) {
@@ -826,9 +958,14 @@
 	};
 
 	/**
-	 * 坐标输入落子。
-	 * 客户端只拦截「明显非法」的情况（格式、范围、占用、回合），
+	 * 坐标 spinner 落子。
+	 * 客户端只拦截「明显非法」的情况（范围、占用、回合），
 	 * 最终裁决仍在服务端 —— 双方各按一套规则是联机对战的经典坑。
+	 *
+	 * 交互分工：
+	 *   - 每轴两枚按钮（.game3d-coord-step）负责增减，支持点按、长按连续、键盘上下键；
+	 *   - 数值只存在于 .game3d-coord-input，spinner 只是它的可视化，
+	 *     因此 submitMove / restoreSubmitted / refreshPreview 一行都不用改。
 	 */
 	App.prototype.bindMoveForm = function () {
 		var self = this;
@@ -836,6 +973,11 @@
 		this.moveBtn = $('#btn-move');
 		this.moveHint = $('#coord-hint');
 		this.coordInputs = [$('#coord-x'), $('#coord-y'), $('#coord-z')];
+		this.coordValues = [
+			$('#coord-x-value'),
+			$('#coord-y-value'),
+			$('#coord-z-value')
+		];
 
 		if (!this.moveForm || !this.coordInputs[0]) return;
 
@@ -844,24 +986,208 @@
 			self.submitMove();
 		});
 
+		// 从 DOM 里取按钮，避免再引入一套与模板平行的 id 契约
+		var steps = [];
+		for (var i = 0; i < 3; i++) {
+			var box = this.coordInputs[i] ? this.coordInputs[i].parentNode : null;
+			steps.push(box ? box.querySelectorAll('.game3d-coord-step') : []);
+		}
+		this.coordSteps = steps;
+
+		for (var axis = 0; axis < 3; axis++) {
+			( function (axisIndex) {
+				var group = steps[axisIndex];
+				if (!group || !group.length) return;
+				var wire = function (btn) {
+					// 必须把 delta 固化成形参：按钮是 [上, 下] 两个，
+					// 若把 delta 交给循环里的 var，闭包会共享最后一轮的 -1，
+					// 「上」键就会倒着走（真实页面上同样会错）。
+					var delta = parseInt(btn.getAttribute('data-step'), 10) || 1;
+
+					// 点击处理：一次真实鼠标点击的事件顺序是
+					//   pointerdown -> pointerup -> click
+					// pointerdown 里已经走过一步，所以随后的 click 必须跳过，
+					// 否则「点一下」会前进两格。
+					// 判据是「这次 click 是否属于刚按过的那个按钮」：
+					// 键盘 Enter 只派发 click、没有 pointerdown，也就不会命中，
+					// 因此键盘激活照常步进 —— 比单纯按时间复位精确。
+					btn.addEventListener('click', function (e) {
+						e.preventDefault();
+						if (self._suppressClickBtn === btn) {
+							// 消费掉本次配对，避免残留标志影响后续交互
+							self._suppressClickBtn = null;
+							return;
+						}
+						self.stepCoord(axisIndex, delta);
+					});
+					btn.addEventListener('pointerdown', function (e) {
+						if (btn.disabled) return;
+						e.preventDefault();
+						// 覆盖式赋值：任何一次新的按下都重新配对，
+						// 即使上一次按下没有对应的 click（例如按住后在按下的
+						// 瞬间被禁用），也不会把旧标志留给后面的键盘激活。
+						self._suppressClickBtn = btn;
+						self._beginHold(axisIndex, delta);
+					});
+					// 只监听 pointerup / pointercancel，不监听 pointerleave：
+					// 按下后手指滑出按钮再松开，pointerdown 那一步已经生效，
+					// 此时取消会让玩家看到「数字跳了又弹回」，反而更困惑。
+					// 同时 pointerleave 会留下未消费的标志，污染下一次键盘激活。
+					['pointerup', 'pointercancel'].forEach(function (type) {
+						btn.addEventListener(type, function () {
+							self._endHold();
+						});
+					});
+					// 键盘可及：按钮获得焦点后上下键同样能步进
+					btn.addEventListener('keydown', function (e) {
+						var dir = self._arrowDir(e);
+						if (!dir) return;
+						e.preventDefault();
+						self.stepCoord(axisIndex, dir);
+					});
+				};
+				for (var b = 0; b < group.length; b++) wire(group[b]);
+			})(axis);
+		}
+
 		this.coordInputs.forEach(function (input, index) {
+			// 隐藏 input 仍接受程序化写入与直接输入：手输依然能用，
+			// 只是页面默认引导玩家走 spinner。
 			input.addEventListener('input', function () {
-				var n = self.boardN();
-				var digits = String(Math.max(0, n - 1)).length;
-				var cleaned = input.value.replace(/\D/g, '').slice(0, digits);
-				if (cleaned !== input.value) input.value = cleaned;
-				// 这一位已经填满且合法就自动跳到下一格，省一次点击；
-				// 不合法（例如 4³ 棋盘里输了 9）就留在原地，让玩家看到提示。
-				var valid = window.Gomoku3DRules.parseCoord(cleaned, n) !== null;
-				if (valid && cleaned.length >= digits && index < 2) {
-					self.coordInputs[index + 1].focus();
-				}
-				self.refreshPreview();
+				self._syncFromInput(index);
+			});
+			input.addEventListener('keydown', function (e) {
+				var dir = self._arrowDir(e);
+				if (!dir) return;
+				e.preventDefault();
+				self.stepCoord(index, dir);
 			});
 			input.addEventListener('focus', function () {
 				input.select();
 			});
 		});
+
+		this.resetCoords();
+	};
+
+	/** 上下方向键 -> ±1；其它键返回 0 */
+	App.prototype._arrowDir = function (e) {
+		if (e.key === 'ArrowUp') return 1;
+		if (e.key === 'ArrowDown') return -1;
+		return 0;
+	};
+
+	/**
+	 * 长按开始：先走一步，停顿 HOLD_DELAY_MS 后按 HOLD_REPEAT_MS 连发。
+	 *
+	 * 「随后那次 click 要跳过」的配对由调用方（pointerdown 处理函数）
+	 * 通过 _suppressClickBtn 记录，这里只管步进与连发计时。
+	 */
+	App.prototype._beginHold = function (index, delta) {
+		var self = this;
+		this._endHold();
+		this._dragging = true;
+		this.stepCoord(index, delta);
+		this._holdTimer = setTimeout(function () {
+			self._holdTimer = null;
+			self._holdRepeat = setInterval(function () {
+				self.stepCoord(index, delta, true);
+			}, HOLD_REPEAT_MS);
+		}, HOLD_DELAY_MS);
+	};
+
+	/**
+	 * 松手：清定时器、解除预览屏蔽，并补一次完整刷新。
+	 *
+	 * 刻意不动 _suppressClickBtn：pointerup 之后浏览器还会补一个 click，
+	 * 若在这里清掉配对，那次 click 就会再多走一步（「点一下走两格」）。
+	 * 配对由 click 处理函数消费。
+	 */
+	App.prototype._endHold = function () {
+		if (this._holdTimer) {
+			clearTimeout(this._holdTimer);
+			this._holdTimer = null;
+		}
+		if (this._holdRepeat) {
+			clearInterval(this._holdRepeat);
+			this._holdRepeat = null;
+		}
+		if (!this._dragging) return;
+		this._dragging = false;
+		this.refreshPreview();
+	};
+
+	/** 单步增减某一轴的坐标；defer 为 true 时跳过预览刷新（长按连发用） */
+	App.prototype.stepCoord = function (index, delta, defer) {
+		var Rules = window.Gomoku3DRules;
+		var input = this.coordInputs ? this.coordInputs[index] : null;
+		if (!input || input.disabled) return;
+
+		var n = this.boardN();
+		var next = Rules.stepCoord(this.readCoordValue(index), delta, n);
+		this.writeCoord(index, next, !defer);
+	};
+
+	/** 读取某一轴的当前值（以隐藏 input 为准，它是唯一数据来源） */
+	App.prototype.readCoordValue = function (index) {
+		var Rules = window.Gomoku3DRules;
+		var input = this.coordInputs ? this.coordInputs[index] : null;
+		var raw = input ? input.value : '';
+		var parsed = Rules.parseCoord(raw, this.boardN());
+		return parsed === null ? DEFAULT_COORD : parsed;
+	};
+
+	/** 写入某一轴的坐标，并同步 spinner 读数；refresh 决定是否重算预览 */
+	App.prototype.writeCoord = function (index, value, refresh) {
+		var n = this.boardN();
+		var v = window.Gomoku3DRules.clampCoord(value, n);
+		if (this.coordInputs && this.coordInputs[index]) {
+			this.coordInputs[index].value = String(v);
+		}
+		this.syncCoordDisplay(index, v);
+		if (refresh !== false && !this._dragging) this.refreshPreview();
+	};
+
+	/** 把隐藏 input 里的值回填到 spinner 读数（手动输入 / 服务端回填后调用） */
+	App.prototype.syncCoordDisplay = function (index, value) {
+		var el = this.coordValues ? this.coordValues[index] : null;
+		if (!el) return;
+		var v = value === undefined ? this.readCoordValue(index) : value;
+		var text = String(v);
+		// 相同文本不写 DOM，避免长按连发时无谓的重排
+		if (el.textContent !== text) el.textContent = text;
+	};
+
+	/**
+	 * 手输路径：隐藏 input 被直接编辑时规范化取值并同步 spinner 读数。
+	 * spinner 是主路径，但 input 仍然可聚焦可输入 —— 键盘玩家敲数字比连点快，
+	 * 而「值只存一份」的约定让这条路径不需要任何额外状态。
+	 */
+	App.prototype._syncFromInput = function (index) {
+		var Rules = window.Gomoku3DRules;
+		var input = this.coordInputs[index];
+		var n = this.boardN();
+		var digits = String(Math.max(0, n - 1)).length;
+		var cleaned = String(input.value).replace(/\D/g, '').slice(0, digits);
+		if (cleaned !== input.value) input.value = cleaned;
+
+		// 位数已填满且合法时才改写读数：允许玩家先敲 "1" 再敲 "2" 组成 "12"
+		var parsed = Rules.parseCoord(cleaned, n);
+		if (parsed !== null) {
+			this.syncCoordDisplay(index, parsed);
+		} else if (cleaned === '') {
+			this.syncCoordDisplay(index, DEFAULT_COORD);
+		}
+		if (!this._dragging) this.refreshPreview();
+	};
+
+	/** 三轴全部回到默认值 (0, 0, 0) */
+	App.prototype.resetCoords = function (refresh) {
+		if (!this.coordInputs) return;
+		for (var i = 0; i < 3; i++) {
+			this.writeCoord(i, DEFAULT_COORD, false);
+		}
+		if (refresh !== false) this.refreshPreview();
 	};
 
 	/** 当前棋盘边长（开局前用大厅的设定值兜底） */
@@ -905,6 +1231,8 @@
 	/** 依据输入框内容刷新落点预览与提示 */
 	App.prototype.refreshPreview = function () {
 		var s = this.state;
+		// 先无条件清掉上一轮的占用提示，下面各分支按需重设
+		this.board.setOccupiedMark(null);
 		if (!s || s.status !== 'playing') {
 			this.board.clearPreview();
 			return;
@@ -923,6 +1251,7 @@
 		var key = window.Gomoku3DRules.formatCoord(res.cell[0], res.cell[1], res.cell[2]);
 		if (this.board.hasStone(res.cell)) {
 			this.board.clearPreview();
+			this.board.setOccupiedMark(res.cell);
 			this.setMoveHint('(' + key + ') 已有棋子', 'error');
 			return;
 		}
@@ -930,10 +1259,18 @@
 		this.setMoveHint('将落在 (' + key + ')', 'ok');
 	};
 
+	/**
+	 * 坐标回到默认值 (0, 0, 0) 并收起预览。
+	 * 提交后、退出房间后都走这里：spinner 需要一个明确的起点，
+	 * 而不是像旧版文本框那样留空让人不知所措。
+	 */
 	App.prototype.clearCoords = function (focus) {
 		if (!this.coordInputs) return;
-		for (var i = 0; i < 3; i++) this.coordInputs[i].value = '';
-		if (this.board) this.board.clearPreview();
+		this.resetCoords(false);
+		if (this.board) {
+			this.board.clearPreview();
+			this.board.setOccupiedMark(null);
+		}
 		if (focus) this.coordInputs[0].focus();
 	};
 
@@ -954,6 +1291,7 @@
 		}
 		var key = window.Gomoku3DRules.formatCoord(res.cell[0], res.cell[1], res.cell[2]);
 		if (this.board.hasStone(res.cell)) {
+			this.board.setOccupiedMark(res.cell);
 			this.setMoveHint('(' + key + ') 已有棋子', 'error');
 			return;
 		}
@@ -963,13 +1301,26 @@
 		this.setMoveHint('已提交 (' + key + ')，等待服务端确认…', 'info');
 	};
 
-	/** 服务端拒绝落子时把坐标填回输入框，省得玩家重敲 */
+	/** 服务端拒绝落子时把坐标填回 spinner，省得玩家重敲 */
 	App.prototype.restoreSubmitted = function () {
 		if (!this.lastSubmitted || !this.coordInputs) return;
 		var cell = this.lastSubmitted;
 		this.lastSubmitted = null;
-		for (var i = 0; i < 3; i++) this.coordInputs[i].value = String(cell[i]);
+		for (var i = 0; i < 3; i++) {
+			this.writeCoord(i, cell[i], false);
+		}
 		this.refreshPreview();
+	};
+
+	/** 批量启停三轴的上下键 */
+	App.prototype.setStepsEnabled = function (on) {
+		if (!this.coordSteps) return;
+		for (var i = 0; i < this.coordSteps.length; i++) {
+			var group = this.coordSteps[i];
+			for (var j = 0; j < group.length; j++) {
+				group[j].disabled = !on;
+			}
+		}
 	};
 
 	/** 依据局面启停输入区，并在轮到自己时刷新预览 */
@@ -977,9 +1328,13 @@
 		if (!this.coordInputs) return;
 		var n = s && s.n ? s.n : this.boardN();
 		var digits = String(Math.max(0, n - 1)).length;
-		this.coordInputs.forEach(function (input) {
+		var self = this;
+		this.coordInputs.forEach(function (input, index) {
 			input.maxLength = digits;
 			input.placeholder = '0-' + (n - 1);
+			// 棋盘变小（例如换了一局 N=4）时，旧的两位坐标必须夹回范围内，
+			// 否则 spinner 会显示 9 而实际提交的是越界值
+			self.writeCoord(index, self.readCoordValue(index), false);
 		});
 
 		var playing = !!s && s.status === 'playing';
@@ -989,11 +1344,15 @@
 		for (var i = 0; i < 3; i++) this.coordInputs[i].disabled = !myTurn;
 		if (this.moveBtn) this.moveBtn.disabled = !myTurn;
 		if (this.moveForm) this.moveForm.classList.toggle('is-locked', !myTurn);
+		// 上下键跟着一起禁用，否则会留下「按钮能点但发不出去」的中间态
+		this.setStepsEnabled(myTurn);
 
 		if (myTurn) {
 			this.refreshPreview();
 		} else {
 			this.board.clearPreview();
+			// 失去回合（超时/认输/结束）时占用提示一并收起
+			this.board.setOccupiedMark(null);
 			this.setMoveHint(playing ? '等待对手落子…' : '', 'info');
 		}
 	};

@@ -2,6 +2,7 @@ const fs = require('fs')
 const path = require('path')
 
 const render = require('../lib/render')
+const comments = require('../server/comments')
 
 const ROOT = render.ROOT
 const POSTS_DIR = path.join(ROOT, 'src', 'blog', 'posts')
@@ -13,6 +14,9 @@ const blogConf = config.blog || {}
 const SITE_URL = String(blogConf.url || '').replace(/\/+$/, '')
 const BLOG_TITLE = blogConf.title || 'Blog'
 const BLOG_DESC = blogConf.description || config.head.description || ''
+
+// 静态产物同样展示评论内容，但不提供可用的提交目标（无后端）。
+const COMMENTS_ON = blogConf.comments !== false
 
 const esc = render.esc
 
@@ -184,6 +188,10 @@ function build () {
 	)
 
 	full.forEach(function (post) {
+		// 静态产物没有后端：submitUrl 传空，前端会提示需在动态服务下提交。
+		var list = COMMENTS_ON
+			? comments.listBySlug(post.slug).map(comments.publicComment)
+			: []
 		writeFile(
 			path.join(OUT_DIR, 'posts', post.slug, 'index.html'),
 			render.renderPost(
@@ -193,7 +201,11 @@ function build () {
 					math: true,
 					title: post.title + ' · ' + BLOG_TITLE,
 					description: post.summary,
-					post: post
+					post: post,
+					commentsOn: COMMENTS_ON,
+					comments: list,
+					commentCount: list.length,
+					submitUrl: ''
 				})
 			)
 		)

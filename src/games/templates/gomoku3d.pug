@@ -64,7 +64,7 @@ block content
 
 			div#stage.game3d-stage
 				canvas#canvas3d
-				div#stage-tip.game3d-stage-tip 拖拽旋转 · 滚轮缩放 · 在下方输入坐标落子
+				div#stage-tip.game3d-stage-tip 拖拽旋转 · 滚轮缩放 · 在下方用上下键调整坐标落子
 				div#overlay.game3d-overlay(hidden)
 					div.game3d-overlay-card
 						h3#overlay-title.game3d-overlay-title
@@ -81,16 +81,34 @@ block content
 							b= axis.label
 							| 正方向 → 屏幕#{axis.screen}
 
+				//- 每个坐标是一组 spinner：上方读当前值，左右两枚按钮分别是「上一位/下一位」。
+				//- 真正被提交的值仍然放在 .game3d-coord-input（视觉隐藏），
+				//- 这样校验与回填只有一条数据来源，不随 UI 形态改变。
 				form#move-form.game3d-coords(novalidate)
-					label.game3d-coord
-						span.game3d-coord-key x
-						input#coord-x.game3d-coord-input(type="text" inputmode="numeric" autocomplete="off" maxlength="1" placeholder="0" aria-label="x 坐标")
-					label.game3d-coord
-						span.game3d-coord-key y
-						input#coord-y.game3d-coord-input(type="text" inputmode="numeric" autocomplete="off" maxlength="1" placeholder="0" aria-label="y 坐标")
-					label.game3d-coord
-						span.game3d-coord-key z
-						input#coord-z.game3d-coord-input(type="text" inputmode="numeric" autocomplete="off" maxlength="1" placeholder="0" aria-label="z 坐标")
+					mixin coordSpinner(key, label)
+						span.game3d-coord
+							span.game3d-coord-head
+								b.game3d-coord-key= key
+								span.game3d-coord-value(id=`coord-${key}-value` aria-live="polite") 0
+							span.game3d-coord-body
+								span.game3d-coord-steps
+									button.game3d-coord-step.is-up(type="button" data-step="1" data-axis=key aria-label=`${label} 加大` title="上一位")
+										span.game3d-coord-arrow &plus;
+									button.game3d-coord-step.is-down(type="button" data-step="-1" data-axis=key aria-label=`${label} 减小` title="下一位")
+										span.game3d-coord-arrow &minus;
+								input.game3d-coord-input(
+									id=`coord-${key}`
+									type="text"
+									inputmode="numeric"
+									autocomplete="off"
+									maxlength="1"
+									value="0"
+									placeholder="0"
+									aria-label=`${label} 坐标`
+								)
+					+coordSpinner('x', 'x')
+					+coordSpinner('y', 'y')
+					+coordSpinner('z', 'z')
 					button#btn-move.game3d-btn.is-primary(type="submit") 落子
 
 				p#coord-hint.game3d-move-hint
@@ -109,13 +127,15 @@ block content
 		details.game3d-rules
 			summary 规则
 			ul
-				li 棋盘是 N³ 个格子，每个格子由 (x, y, z) 唯一确定，坐标取值 0…N-1。
-				li 落子方式：在下方输入框填写 x、y、z 三个坐标后按「落子」（或回车）。
+				li 棋盘是 N³ 个格子，每个格子由 (x, y, z) 唯一确定，坐标取值 0…N-1，默认 (0, 0, 0)。
+				li 落子方式：用每个坐标旁的 #[b +] / #[b −] 按钮调整数值（#[b +] 加 1、#[b −] 减 1，
+					| 到边界后从另一端继续），调好后按「落子」或回车。
 					| 画布只用于观察，拖拽旋转、滚轮缩放，点击不会落子。
+				li 每局落子后坐标回到默认 (0, 0, 0)，方便按固定起点推算位置。
 				li 坐标正方向以棋盘最小角的三支箭头为准：
 					each axis in axes
 						|  #[b= axis.label] 指向屏幕#{axis.screen}#{axis === axes[axes.length - 1] ? '。' : '，'}
-				li 输入坐标时，棋盘上会出现半透明预览球，落子前即可确认位置。
+				li 调整坐标时，棋盘上会出现半透明预览球，落子前即可确认位置。
 				li 双方轮流在空格落子，先形成连续 M 个同色格子的一方获胜。
 				li 「连续」包含 13 个方向：3 条轴向、6 条面对角线、4 条体对角线。
 				li 棋盘下满且无人连成 M 子为平局。

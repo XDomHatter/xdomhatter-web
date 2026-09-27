@@ -575,9 +575,17 @@ body.games-body {
 	}
 }
 
+/* 单个坐标的 spinner：上行读数值，下行是「上下两枚按钮 + 数值框」 */
 .game3d-coord {
 	display: inline-flex;
+	flex-direction: column;
 	align-items: center;
+	gap: 5px;
+}
+
+.game3d-coord-head {
+	display: inline-flex;
+	align-items: baseline;
 	gap: 6px;
 }
 
@@ -585,6 +593,81 @@ body.games-body {
 	color: @text-dim;
 	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	font-size: 13px;
+}
+
+/* 当前值：spinner 的「读出」窗口 */
+.game3d-coord-value {
+	color: @text-strong;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 18px;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: 0.5px;
+}
+
+.game3d-coord-body {
+	display: inline-flex;
+	align-items: stretch;
+	gap: 4px;
+}
+
+/* 上下两枚按钮竖排，整体高度与数值框对齐 */
+.game3d-coord-steps {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.game3d-coord-step {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	flex: 1 1 auto;
+	min-height: 16px;
+	padding: 0;
+	color: @text;
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid @border;
+	border-radius: 6px;
+	font-family: inherit;
+	font-size: 13px;
+	line-height: 1;
+	cursor: pointer;
+	user-select: none;
+	// 长按连发时不要让浏览器把连续按压当成文本选择 / 双击缩放
+	touch-action: none;
+	-webkit-tap-highlight-color: transparent;
+	transition: background-color 0.2s @ease, border-color 0.2s @ease,
+		color 0.2s @ease, transform 0.12s @ease-out;
+
+	&:hover:not(:disabled) {
+		color: #fff;
+		background: rgba(127, 119, 221, 0.28);
+		border-color: fade(@accent, 70%);
+	}
+
+	&:active:not(:disabled) {
+		transform: scale(0.92);
+		background: rgba(127, 119, 221, 0.42);
+	}
+
+	&:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	&:focus-visible {
+		outline: 1px solid rgba(127, 119, 221, 0.8);
+		outline-offset: 2px;
+	}
+}
+
+.game3d-coord-arrow {
+	display: block;
+	// 加号/减号字形本身偏上，压低一点才在两枚按钮里视觉居中
+	font-size: 14px;
+	font-weight: 500;
+	transform: translateY(-0.5px);
 }
 
 .game3d-coord-input {
@@ -711,6 +794,14 @@ body.games-body {
 		font-size: 16px;
 	}
 
+	.game3d-coord-value {
+		font-size: 16px;
+	}
+
+	.game3d-coord-step {
+		width: 24px;
+	}
+
 	.game3d-coords .game3d-btn.is-primary {
 		flex: 1 0 auto;
 		padding: 10px 18px;
@@ -758,6 +849,7 @@ body.games-body {
 	.game3d-dot,
 	.game3d-move-hint,
 	.game3d-coord-input,
+	.game3d-coord-step,
 	.game3d-stage-tip {
 		transition-duration: 0.01ms;
 	}

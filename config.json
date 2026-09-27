@@ -55,7 +55,8 @@
 	"blog": {
 		"title": "Blog",
 		"description": "Code & Input & Output",
-		"url": "http://xdomhatter.cn"
+		"url": "http://xdomhatter.cn",
+		"comments": true
 	},
 	"games": {
 		"title": "Games",

@@ -66,6 +66,24 @@
 		#preview code { font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 12.5px; }
 		#preview .katex { color: var(--strong); }
 		.empty { color: var(--dim); font-size: 12px; }
+		/* 评论管理 */
+		.cmt { list-style: none; margin: 0; padding: 0; }
+		.cmt li {
+			padding: 12px; margin-bottom: 10px;
+			background: rgba(255,255,255,.02);
+			border: 1px solid var(--border); border-radius: 8px;
+		}
+		.cmt .top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-bottom: 6px; }
+		.cmt .who { color: var(--strong); font-size: 13px; }
+		.cmt .meta { color: var(--dim); font-size: 11px; }
+		.cmt .txt { color: var(--text); font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+		.cmt .ops { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+		.cmt .ops button { padding: 4px 10px; font-size: 12px; }
+		.pending { border-color: rgba(224,164,74,.5) !important; }
+		.badge.warn { color: #e0a44a; border-color: rgba(224,164,74,.5); }
+		.tabs { display: flex; gap: 8px; margin: 0 0 18px; }
+		.tabs button.on { background: rgba(127,119,221,.28); border-color: var(--accent); }
+		#commentsView { display: none; }
 	</style>
 </head>
 <body>
@@ -78,7 +96,12 @@
 		<a href="/blog/" target="_blank" rel="noopener">查看博客 ↗</a>
 	</div>
 
-	<div class="cols">
+	<div class="tabs">
+		<button id="tabPosts" class="on">文章</button>
+		<button id="tabComments">评论</button>
+	</div>
+
+	<div class="cols" id="postsView">
 		<div class="panel">
 			<h2>文章</h2>
 			<ul id="list" class="list"><li class="empty">未连接</li></ul>
@@ -127,12 +150,28 @@
 		</div>
 	</div>
 
+	<div id="commentsView">
+		<div class="panel">
+			<div class="row" style="justify-content:space-between;margin-bottom:12px">
+				<h2 style="margin:0">评论</h2>
+				<div class="row">
+					<label style="margin:0;display:flex;align-items:center;gap:6px">
+						<input id="onlyPending" type="checkbox" style="width:auto"> 只看待审核
+					</label>
+					<button id="refreshComments">刷新</button>
+				</div>
+			</div>
+			<ul id="commentList" class="cmt"><li class="empty">未连接</li></ul>
+		</div>
+	</div>
+
 	<script>
 	(function () {
 		var TOKEN_KEY = 'blog_admin_token';
 		var $ = function (id) { return document.getElementById(id); };
 		var token = localStorage.getItem(TOKEN_KEY) || '';
 		var current = null;
+		var allComments = [];
 		var previewTimer = null;
 
 		$('token').value = token;
@@ -264,6 +303,123 @@
 				.then(function (data) { $('preview').innerHTML = data.html; })
 				.catch(function () { /* 预览失败不打扰编辑 */ });
 		}
+
+		/** 用 DOM API 渲染，避免评论内容里的 HTML 被当作标记执行 */
+		function renderComments () {
+			var list = $('commentList');
+			var onlyPending = $('onlyPending').checked;
+			list.innerHTML = '';
+
+			var items = allComments.filter(function (c) {
+				return onlyPending ? c.approved === false : true;
+			});
+			if (!items.length) {
+				list.innerHTML = '<li class="empty">' + (onlyPending ? '没有待审核评论' : '还没有评论') + '</li>';
+				return;
+			}
+
+			items.forEach(function (c) {
+				var li = document.createElement('li');
+				if (c.approved === false) li.className = 'pending';
+
+				var top = document.createElement('div');
+				top.className = 'top';
+				var who = document.createElement('span');
+				who.className = 'who';
+				who.textContent = c.nick || '匿名';
+				var meta = document.createElement('span');
+				meta.className = 'meta';
+				meta.textContent = (c.created || '').slice(0, 19).replace('T', ' ') +
+					' · ' + c.slug + (c.email ? ' · ' + c.email : '');
+				top.appendChild(who);
+				top.appendChild(meta);
+				if (c.approved === false) {
+					var badge = document.createElement('span');
+					badge.className = 'badge warn';
+					badge.textContent = '待审核';
+					top.appendChild(badge);
+				}
+
+				var txt = document.createElement('div');
+				txt.className = 'txt';
+				txt.textContent = c.content;
+
+				var ops = document.createElement('div');
+				ops.className = 'ops';
+				if (c.approved === false) {
+					var okBtn = document.createElement('button');
+					okBtn.className = 'primary';
+					okBtn.textContent = '通过审核';
+					okBtn.addEventListener('click', function () { approveComment(c.id); });
+					ops.appendChild(okBtn);
+				}
+				var link = document.createElement('a');
+				link.href = '/blog/posts/' + encodeURIComponent(c.slug) + '/';
+				link.target = '_blank';
+				link.rel = 'noopener';
+				link.textContent = '查看文章 ↗';
+				link.style.fontSize = '12px';
+				link.style.alignSelf = 'center';
+				ops.appendChild(link);
+
+				var del = document.createElement('button');
+				del.className = 'danger';
+				del.textContent = '删除';
+				del.addEventListener('click', function () { deleteComment(c.id); });
+				ops.appendChild(del);
+
+				li.appendChild(top);
+				li.appendChild(txt);
+				li.appendChild(ops);
+				list.appendChild(li);
+			});
+		}
+
+		function loadComments () {
+			return api('/api/admin/comments').then(function (data) {
+				allComments = data.comments || [];
+				renderComments();
+			});
+		}
+
+		function approveComment (id) {
+			api('/api/admin/comments/' + encodeURIComponent(id) + '/approve', { method: 'POST' })
+				.then(function () {
+					setStatus('已通过审核', 'ok');
+					return loadComments();
+				})
+				.catch(function (err) { setStatus(err.message, 'err'); });
+		}
+
+		function deleteComment (id) {
+			if (!confirm('确认删除这条评论？此操作不可撤销。')) return;
+			api('/api/admin/comments/' + encodeURIComponent(id), { method: 'DELETE' })
+				.then(function () {
+					setStatus('已删除评论', 'ok');
+					return loadComments();
+				})
+				.catch(function (err) { setStatus(err.message, 'err'); });
+		}
+
+		function showView (which) {
+			var isComments = which === 'comments';
+			$('postsView').style.display = isComments ? 'none' : '';
+			$('commentsView').style.display = isComments ? 'block' : 'none';
+			$('tabPosts').className = isComments ? '' : 'on';
+			$('tabComments').className = isComments ? 'on' : '';
+			$('newPost').style.display = isComments ? 'none' : '';
+		}
+
+		$('tabPosts').addEventListener('click', function () { showView('posts'); });
+		$('tabComments').addEventListener('click', function () {
+			showView('comments');
+			if (!token) { $('commentList').innerHTML = '<li class="empty">请先连接</li>'; return; }
+			loadComments().catch(function (err) { setStatus(err.message, 'err'); });
+		});
+		$('refreshComments').addEventListener('click', function () {
+			loadComments().catch(function (err) { setStatus(err.message, 'err'); });
+		});
+		$('onlyPending').addEventListener('change', renderComments);
 
 		$('connect').addEventListener('click', function () {
 			token = $('token').value.trim();

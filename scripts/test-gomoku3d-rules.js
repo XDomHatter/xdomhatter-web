@@ -382,6 +382,73 @@ test('PLAYER 常量符合约定', function () {
 	assert.strictEqual(Rules.PLAYER_TWO, 2)
 })
 
+/* ---------------- 坐标 spinner：夹取与环绕步进 ---------------- */
+
+console.log('\n[坐标步进]')
+
+test('clampCoord 把越界值夹回 0..n-1', function () {
+	assert.strictEqual(Rules.clampCoord(-1, 4), 0)
+	assert.strictEqual(Rules.clampCoord(0, 4), 0)
+	assert.strictEqual(Rules.clampCoord(3, 4), 3)
+	assert.strictEqual(Rules.clampCoord(9, 4), 3)
+	assert.strictEqual(Rules.clampCoord(7, 8), 7)
+})
+
+test('clampCoord 对非数字退化为 0', function () {
+	// spinner 的值来自内部状态，但仍然防一手 NaN / Infinity：
+	// 一旦漏进棋盘索引，indexOf 会算出 NaN 下标，落子表现为「点了没反应」。
+	assert.strictEqual(Rules.clampCoord(NaN, 4), 0)
+	assert.strictEqual(Rules.clampCoord(Infinity, 4), 0)
+	assert.strictEqual(Rules.clampCoord(-Infinity, 4), 0)
+	assert.strictEqual(Rules.clampCoord(undefined, 4), 0)
+	assert.strictEqual(Rules.clampCoord(1.7, 4), 1)
+})
+
+test('stepCoord 递增到 n-1 后环绕回 0', function () {
+	assert.strictEqual(Rules.stepCoord(0, 1, 4), 1)
+	assert.strictEqual(Rules.stepCoord(1, 1, 4), 2)
+	assert.strictEqual(Rules.stepCoord(3, 1, 4), 0)
+})
+
+test('stepCoord 递减到 0 后环绕到 n-1', function () {
+	assert.strictEqual(Rules.stepCoord(3, -1, 4), 2)
+	assert.strictEqual(Rules.stepCoord(1, -1, 4), 0)
+	assert.strictEqual(Rules.stepCoord(0, -1, 4), 3)
+})
+
+test('stepCoord 结果始终落在 0..n-1（含脏输入）', function () {
+	for (const n of [3, 4, 8, 12]) {
+		for (let v = -5; v <= n + 5; v++) {
+			for (const d of [-1, 1]) {
+				const r = Rules.stepCoord(v, d, n)
+				assert.ok(
+					Rules.isInt(r) && r >= 0 && r < n,
+					'stepCoord(' + v + ',' + d + ',' + n + ') = ' + r
+				)
+			}
+		}
+	}
+})
+
+test('stepCoord 支持一次增减多步（长按连续步进）', function () {
+	assert.strictEqual(Rules.stepCoord(0, 3, 4), 3)
+	assert.strictEqual(Rules.stepCoord(0, 4, 4), 0)
+	assert.strictEqual(Rules.stepCoord(1, -3, 4), 2)
+})
+
+test('stepCoord 在 wrap=false 时退化为夹取', function () {
+	assert.strictEqual(Rules.stepCoord(0, -1, 4, false), 0)
+	assert.strictEqual(Rules.stepCoord(3, 1, 4, false), 3)
+	assert.strictEqual(Rules.stepCoord(2, 1, 4, false), 3)
+})
+
+test('坐标与棋盘边界一致：默认 (0,0,0) 必定合法', function () {
+	for (const n of [3, 4, 8, 12]) {
+		assert.ok(Rules.clampCoord(0, n) === 0)
+		assert.ok(Rules.inBounds(n, 0, 0, 0), 'n=' + n)
+	}
+})
+
 /* ---------------- 汇总 ---------------- */
 
 console.log('\n' + '='.repeat(46))
