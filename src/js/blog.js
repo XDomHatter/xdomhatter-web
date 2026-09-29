@@ -325,6 +325,7 @@
 		var list = document.getElementById('blog-comments-list');
 		var status = document.getElementById('blog-comment-status');
 		var submit = document.getElementById('blog-comment-submit');
+		var toggle = document.getElementById('blog-comment-toggle');
 		var nick = document.getElementById('comment-nick');
 		var email = document.getElementById('comment-email');
 		var url = document.getElementById('comment-url');
@@ -338,6 +339,35 @@
 			if (!status) return;
 			status.textContent = msg || '';
 			status.className = 'blog-comment-status' + (kind ? ' is-' + kind : '');
+		}
+
+		/** 展开或收起表单；moveFocus 用于用户主动点击时的可达性焦点管理 */
+		function setExpanded (expand, moveFocus) {
+			if (!form || !toggle) return;
+			form.classList.toggle('is-collapsed', !expand);
+			toggle.setAttribute('aria-expanded', expand ? 'true' : 'false');
+			toggle.textContent = expand ? '收起' : '写评论';
+			if (!moveFocus) return;
+			if (expand) {
+				if (content) content.focus();
+			} else {
+				toggle.focus();
+			}
+		}
+
+		/** 发表成功后自动收起；若用户随即又开始输入则不打扰 */
+		function scheduleCollapse () {
+			window.setTimeout(function () {
+				if (content && content.value) return;
+				setExpanded(false, false);
+			}, 1600);
+		}
+
+		if (toggle) {
+			toggle.addEventListener('click', function () {
+				var collapsed = form.className.indexOf('is-collapsed') >= 0;
+				setExpanded(collapsed, true);
+			});
 		}
 
 		function store (key, value) {
@@ -514,6 +544,7 @@
 						bumpCount();
 					}
 					setStatus(data.message || '评论已发布', 'ok');
+					scheduleCollapse();
 					return;
 				}
 

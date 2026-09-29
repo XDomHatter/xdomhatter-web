@@ -307,6 +307,12 @@ async function main () {
 	ok('文章页含评论区容器', page.body.indexOf('blog-comments') >= 0)
 	ok('文章页含评论表单', page.body.indexOf('blog-comment-form') >= 0)
 	ok(
+		'评论表单默认折叠（仅切换按钮可见）',
+		page.body.indexOf('blog-comment-toggle') >= 0 &&
+			page.body.indexOf('aria-expanded="false"') >= 0 &&
+			page.body.indexOf('blog-comment-form is-collapsed') >= 0
+	)
+	ok(
 		'文章页表单 action 指向评论接口',
 		page.body.indexOf('action="/api/comments/' + slug + '"') >= 0
 	)

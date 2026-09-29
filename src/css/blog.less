@@ -551,12 +551,45 @@ body.blog-body {
 	}
 
 	/* ---------- 评论表单 ---------- */
-	.blog-comment-form {
+	.blog-comment-toggle {
 		margin-top: 26px;
+		padding: 7px 16px;
+		color: @text-strong;
+		background: transparent;
+		border: 1px solid @border;
+		border-radius: 8px;
+		font-family: inherit;
+		font-size: 13px;
+		letter-spacing: 1px;
+		cursor: pointer;
+		transition: border-color 0.25s @ease, background 0.25s @ease, color 0.25s @ease;
+
+		&:hover,
+		&[aria-expanded="true"] {
+			color: #fff;
+			background: rgba(127, 119, 221, 0.14);
+			border-color: rgba(127, 119, 221, 0.7);
+		}
+
+		&:focus-visible {
+			border-color: rgba(127, 119, 221, 0.7);
+			box-shadow: 0 0 0 3px rgba(127, 119, 221, 0.12);
+			outline: none;
+		}
+	}
+
+	/* 表单默认折叠（.is-collapsed 隐藏），展开时以 blogRise 入场 */
+	.blog-comment-form {
+		margin-top: 14px;
 		padding: 18px 20px;
 		background: @bg-soft;
 		border: 1px solid @border;
 		border-radius: 10px;
+		animation: blogRise 0.35s @ease both;
+
+		&.is-collapsed {
+			display: none;
+		}
 
 		&.is-busy {
 			opacity: 0.72;
@@ -1031,7 +1064,8 @@ body.blog-body {
 		}
 
 		.blog-comments,
-		.blog-comment-item {
+		.blog-comment-item,
+		.blog-comment-form {
 			animation: none;
 			opacity: 1;
 			transform: none;
@@ -1052,6 +1086,11 @@ body.blog-body {
 		.blog-comment-field textarea,
 		.blog-comment-submit {
 			transition-duration: 0.01ms;
+		}
+
+		.blog-comment-form-wrap,
+		.blog-comment-form {
+			transition: none;
 		}
 	}
 

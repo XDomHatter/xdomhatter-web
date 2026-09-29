@@ -56,7 +56,8 @@ block content
 					else
 						p.blog-comments-empty 还没有评论，来说点什么吧。
 
-				form.blog-comment-form#blog-comment-form(method="post" action=(submitUrl || ''))
+				button.blog-comment-toggle#blog-comment-toggle(type="button" aria-expanded="false" aria-controls="blog-comment-form") 写评论
+				form.blog-comment-form#blog-comment-form.is-collapsed(method="post" action=(submitUrl || ''))
 					div.blog-comment-fields
 						label.blog-comment-field
 							span 昵称
