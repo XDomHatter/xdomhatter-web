@@ -11,7 +11,7 @@ block content
 		section#lobby.game3d-lobby
 			div.game3d-panel
 				h2.game3d-panel-title 创建房间
-				p.game3d-panel-desc 设定棋盘边长与连子数，生成房间号后发给对手。
+				p.game3d-panel-desc 设定棋盘边长与连子数，创建后一键复制邀请链接发给对手。
 
 				div.game3d-field
 					label(for="opt-n") 棋盘边长 N
@@ -38,9 +38,9 @@ block content
 
 				button#btn-create.game3d-btn.is-primary(type="button") 创建房间
 
-			div.game3d-panel
+			div#panel-join.game3d-panel
 				h2.game3d-panel-title 加入房间
-				p.game3d-panel-desc 输入对手给你的 4 位房间号。
+				p.game3d-panel-desc 输入对手给你的 4 位房间号，或直接打开对方发来的邀请链接。
 
 				div.game3d-field
 					label(for="join-room") 房间号
@@ -55,6 +55,10 @@ block content
 			div.game3d-hud
 				div.game3d-hud-left
 					span#hud-room.game3d-room 房间 ----
+					button#btn-invite.game3d-btn.is-small(
+						type="button"
+						title="复制邀请链接，发给对手打开即可加入本房间"
+					) 复制邀请链接
 					span#hud-config.game3d-meta
 					span#hud-last.game3d-meta
 				div.game3d-turn

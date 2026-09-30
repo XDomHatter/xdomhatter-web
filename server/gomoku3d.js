@@ -504,9 +504,17 @@ function onJoin (ws, msg) {
 		return
 	}
 
-	const freeSeat = room.seats.findIndex(function (s) {
+	let freeSeat = room.seats.findIndex(function (s) {
 		return !s
 	})
+	if (freeSeat < 0 && room.status !== 'playing') {
+		// 非对局状态下，掉线座位只是幽灵占位（waiting 无宽限计时、finished 已终局），
+		// 允许新访客顶替，否则邀请链接会被幽灵座位永久堵成「房间已满」。
+		// 对局中绝不顶替：那是掉线方的宽限重连权。
+		freeSeat = room.seats.findIndex(function (s) {
+			return s && !s.connected
+		})
+	}
 	if (freeSeat < 0) return err(ws, '房间已满')
 
 	if (room.status === 'finished') {

@@ -116,6 +116,12 @@ body.games-body {
 	max-width: 960px;
 	margin: 0 auto;
 	animation: g3dRise 0.55s @ease-out 0.16s both;
+
+	// display: grid 会盖过 UA 样式表的 [hidden]，必须显式关掉，
+	// 否则进入对局后大厅仍然渲染在棋盘上方
+	&[hidden] {
+		display: none;
+	}
 }
 
 .game3d-panel {
@@ -126,12 +132,23 @@ body.games-body {
 	transition: border-color 0.3s @ease;
 }
 
+// 邀请链接落地时高亮「加入房间」面板，引导视线
+.game3d-panel.is-invite {
+	border-color: fade(@accent, 65%);
+	animation: g3dInvitePulse 1.8s @ease-out 0.3s 3;
+}
+
 .game3d-panel-title {
 	margin: 0 0 6px;
 	color: @text-strong;
 	font-size: 16px;
 	font-weight: 400;
 	letter-spacing: 1px;
+}
+
+// 大厅提示条（邀请引导/错误信息）横贯所有面板列，避免被当成第三列挤到旁边
+.game3d-lobby > .game3d-msg {
+	grid-column: 1 / -1;
 }
 
 .game3d-panel-desc {
@@ -832,12 +849,23 @@ body.games-body {
 	}
 }
 
+@keyframes g3dInvitePulse {
+	0%,
+	100% {
+		box-shadow: 0 0 0 3px rgba(127, 119, 221, 0.1);
+	}
+	50% {
+		box-shadow: 0 0 0 7px rgba(127, 119, 221, 0.16);
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.game3d-header > *,
 	.game3d-lobby,
 	.game3d-arena,
 	.game3d-overlay,
-	.game3d-overlay-card {
+	.game3d-overlay-card,
+	.game3d-panel.is-invite {
 		animation: none;
 		opacity: 1;
 		transform: none;

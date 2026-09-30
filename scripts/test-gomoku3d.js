@@ -345,10 +345,73 @@ ok('掉线宽限超时：reason=disconnect', !!graceState && graceState.reason =
 ok('掉线宽限超时：留守方获胜', !!graceState && graceState.winner === 1)
 g1.close()
 
-game.TIMEOUTS.turn = 120 * 1000
-game.TIMEOUTS.grace = 60 * 1000
+	game.TIMEOUTS.turn = 120 * 1000
+	game.TIMEOUTS.grace = 60 * 1000
 
-a2.close()
+	/* ---------- 15. 幽灵座位可被新访客顶替 ---------- */
+	// 链接邀请场景：房主标签页崩溃/被回收后 sessionStorage 丢失，
+	// 其座位变成幽灵占位。对手已入座时，新访客打开邀请链接应顶替幽灵座位，
+	// 让房间恢复可用，而不是永远收到「房间已满」。
+	const h1 = client(port)
+	await h1.open()
+	h1.send({ type: 'create', n: 4, m: 4, name: '幽灵甲' })
+	const created5 = await h1.wait('created')
+	await h1.wait('state')
+	h1.close() // waiting 状态掉线：座位保留但 connected=false
+	// close 是异步事件，等服务端处理完掉线标记再让新访客进场
+	await delay(300)
+
+	const h2 = client(port)
+	await h2.open()
+	h2.send({ type: 'join', room: created5.room, name: '等待乙' })
+	const joinedWaiting = await h2.wait('joined')
+	ok('访客坐进空位等待房主', joinedWaiting.seat === 1)
+	await h2.wait('state')
+
+	const h3 = client(port)
+	await h3.open()
+	h3.send({ type: 'join', room: created5.room, name: '新访客丙' })
+	const takeover = await h3.wait('joined')
+	ok('waiting 幽灵座位被新访客顶替', takeover.seat === 0 && takeover.reconnect === false)
+	const stGhost = await h3.wait('state')
+	ok('幽灵被顶替后房间恢复开局', stGhost.status === 'playing')
+	h2.close()
+	h3.close()
+
+	/* ---------- 16. 对局中掉线座位受宽限保护 ---------- */
+	const i1 = client(port)
+	await i1.open()
+	i1.send({ type: 'create', n: 4, m: 4, name: '对局甲' })
+	const created6 = await i1.wait('created')
+	const i2 = client(port)
+	await i2.open()
+	i2.send({ type: 'join', room: created6.room, name: '对局乙' })
+	await i2.wait('joined')
+	await i1.wait('state')
+	i1.drain()
+	i2.close() // 乙在对局中掉线，进入宽限期
+
+	{
+		const deadline = Date.now() + 5000
+		let dropped2 = null
+		while (Date.now() < deadline) {
+			const s = await i1.wait('state', 5000)
+			if (s.seats[1] && s.seats[1].connected === false) {
+				dropped2 = s
+				break
+			}
+		}
+		ok('对局中掉线进入宽限', !!dropped2)
+	}
+
+	const i3 = client(port)
+	await i3.open()
+	i3.send({ type: 'join', room: created6.room, name: '围观丙' })
+	ok('对局中掉线座位不被顶替', (await i3.wait('error')).message.indexOf('已满') >= 0)
+	i3.close()
+	i1.close()
+
+	a2.close()
 	b.close()
 	await delay(100)
 	server.close()

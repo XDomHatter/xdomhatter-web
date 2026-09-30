@@ -58,6 +58,108 @@
 	}
 
 	/* ==================================================================
+	 * 邀请链接：昵称记忆、座位会话、剪贴板
+	 * ================================================================== */
+	var NAME_KEY = 'gomoku3d:name';
+	var SESSION_KEY = 'gomoku3d:session';
+
+	function loadSavedName() {
+		try {
+			return (window.localStorage.getItem(NAME_KEY) || '').trim();
+		} catch (e) {
+			return '';
+		}
+	}
+
+	function saveName(name) {
+		if (!name) return;
+		try {
+			window.localStorage.setItem(NAME_KEY, name);
+		} catch (e) {
+			/* 隐私模式下写入失败可忽略 */
+		}
+	}
+
+	// 座位会话：{room, token}。token 只存 sessionStorage，
+	// 用于「对局中刷新页面」时向服务端证明自己是原座位，关掉标签页即作废。
+	function readSession() {
+		try {
+			var raw = window.sessionStorage.getItem(SESSION_KEY);
+			return raw ? JSON.parse(raw) : null;
+		} catch (e) {
+			return null;
+		}
+	}
+
+	function saveSession(room, token) {
+		try {
+			window.sessionStorage.setItem(
+				SESSION_KEY,
+				JSON.stringify({ room: room, token: token })
+			);
+		} catch (e) {
+			/* ignore */
+		}
+	}
+
+	function clearSession() {
+		try {
+			window.sessionStorage.removeItem(SESSION_KEY);
+		} catch (e) {
+			/* ignore */
+		}
+	}
+
+	/**
+	 * 邀请链接里的房间号：#room=1234 或 ?room=1234。
+	 * (?!\d) 防止把 #room=12345 误截成前 4 位。
+	 */
+	function parseRoomFromUrl() {
+		var m = (location.hash || '').match(/room=(\d{4})(?!\d)/);
+		if (m) return m[1];
+		try {
+			var q = new URLSearchParams(location.search).get('room');
+			if (q && /^\d{4}$/.test(q)) return q;
+		} catch (e) {
+			/* 没有 URLSearchParams 的旧浏览器，跳过 query 读取 */
+		}
+		return null;
+	}
+
+	// 复制文本到剪贴板；clipboard API 不可用时退回 execCommand，done(ok) 报告结果
+	function copyText(text, done) {
+		if (navigator.clipboard && navigator.clipboard.writeText) {
+			navigator.clipboard.writeText(text).then(
+				function () {
+					done(true);
+				},
+				function () {
+					done(legacyCopy(text));
+				}
+			);
+		} else {
+			done(legacyCopy(text));
+		}
+	}
+
+	function legacyCopy(text) {
+		var ok = false;
+		var ta = document.createElement('textarea');
+		ta.value = text;
+		ta.style.position = 'fixed';
+		ta.style.left = '-9999px';
+		document.body.appendChild(ta);
+		ta.select();
+		try {
+			ok = document.execCommand('copy');
+		} catch (e) {
+			/* ignore */
+		}
+		document.body.removeChild(ta);
+		return ok;
+	}
+
+	/* ==================================================================
 	 * 网络层
 	 * ================================================================== */
 	function Net() {
@@ -866,10 +968,22 @@
 			self.board.resize();
 		});
 
-		// 从 URL 里带房间号可直接预填，便于分享链接
-		var m = location.hash.match(/room=(\d{4})/);
-		if (m) {
-			$('#join-room').value = m[1];
+		// 邀请链接（#room=NNNN / ?room=NNNN）：预填房号兜底，
+		// 若 sessionStorage 里有同一房间的座位 token（对局中刷新）则静默重连，
+		// 否则进入「确认后加入」的邀请模式
+		var code = parseRoomFromUrl();
+		if (code) $('#join-room').value = code;
+		var savedName = loadSavedName();
+		if (savedName) $('#opt-name').value = savedName;
+
+		if (code) {
+			var sess = readSession();
+			if (sess && sess.room === code && sess.token) {
+				self.join(code, savedName, sess.token);
+				self.msg('正在回到房间 ' + code + ' …', 'info');
+			} else {
+				self.enterInviteMode(code);
+			}
 		}
 	};
 
@@ -903,6 +1017,7 @@
 			var n = parseInt(rangeN.value, 10);
 			var m = parseInt(rangeM.value, 10);
 			var name = $('#opt-name').value.trim();
+			saveName(name);
 			self.showGridPref = $('#opt-grid').checked;
 			self.create(n, m, name);
 		});
@@ -921,6 +1036,7 @@
 				self.msg('请输入 4 位房间号');
 				return;
 			}
+			saveName(name);
 			self.showGridPref = $('#opt-grid').checked;
 			self.join(code, name);
 		});
@@ -950,6 +1066,10 @@
 
 		$('#btn-recenter').addEventListener('click', function () {
 			self.board.resetView();
+		});
+
+		$('#btn-invite').addEventListener('click', function () {
+			self.copyInvite();
 		});
 
 		$('#arena-grid').addEventListener('change', function (e) {
@@ -1375,6 +1495,7 @@
 			self.room = msg.room;
 			self.myPlayer = msg.player;
 			self.net.token = msg.token;
+			saveSession(msg.room, msg.token);
 			self.enterArena(msg.room, msg.n, msg.m);
 			self.msg('');
 			location.hash = 'room=' + msg.room;
@@ -1384,6 +1505,7 @@
 			self.room = msg.room;
 			self.myPlayer = msg.player;
 			self.net.token = msg.token;
+			saveSession(msg.room, msg.token);
 			self.enterArena(msg.room, msg.n, msg.m);
 			self.msg('');
 			location.hash = 'room=' + msg.room;
@@ -1455,18 +1577,53 @@
 			});
 	};
 
-	App.prototype.join = function (code, name) {
+	App.prototype.join = function (code, name, token) {
 		var self = this;
 		this.suppressReconnect = false;
 		this.msg('');
 		this.net
 			.connect()
 			.then(function () {
-				self.net.send({ type: 'join', room: code, name: name });
+				// token 只在「刷新后回到原座位」时携带，服务端凭它恢复座位
+				self.net.send({ type: 'join', room: code, name: name, token: token });
 			})
 			.catch(function (e) {
 				self.msg(e.message || '无法连接服务器');
 			});
+	};
+
+	/**
+	 * 受邀者落地：打开带房间号的链接后，大厅切到邀请模式——
+	 * 高亮加入面板、引导填昵称，并预先建立 WebSocket，
+	 * 点击「加入房间」时不必再等握手。
+	 */
+	App.prototype.enterInviteMode = function (code) {
+		var panel = $('#panel-join');
+		if (panel) panel.classList.add('is-invite');
+		this.msg('收到邀请：加入房间 ' + code + '，填好昵称后点「加入房间」', 'info');
+		var nameInput = $('#opt-name');
+		if (nameInput) nameInput.focus();
+		this.net.connect().catch(function () {
+			/* 预连接失败不拦路：点「加入房间」时会重试并给出提示 */
+		});
+	};
+
+	App.prototype.inviteLink = function () {
+		// pathname 保持当前路径（/games/gomoku3d/），hash 才是邀请凭据
+		return location.origin + location.pathname + '#room=' + this.room;
+	};
+
+	App.prototype.copyInvite = function () {
+		var self = this;
+		if (!this.room) return;
+		var url = this.inviteLink();
+		copyText(url, function (ok) {
+			if (ok) {
+				self.toast('邀请链接已复制，发给对手打开即可加入');
+			} else {
+				window.prompt('复制失败，请手动复制邀请链接：', url);
+			}
+		});
 	};
 
 	App.prototype.enterArena = function (room, n, m) {
@@ -1496,6 +1653,10 @@
 		$('#arena').hidden = true;
 		$('#lobby').hidden = false;
 		$('#overlay').hidden = true;
+		// 座位已主动放弃，凭据作废；同时摘掉邀请态高亮
+		clearSession();
+		var panel = $('#panel-join');
+		if (panel) panel.classList.remove('is-invite');
 		if (location.hash) location.hash = '';
 		this.clearCoords(false);
 		this.setMoveHint('');
