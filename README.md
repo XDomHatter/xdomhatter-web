@@ -4,7 +4,7 @@
 >
 > 首页基于 [SimonAKing/HomePage](https://github.com/SimonAKing/HomePage) 的 Gulp + Pug + Less 流体动画方案，在此基础上扩展出博客模块、评论系统、游戏中心与 Node 服务端。
 
-[在线访问](http://xdomhatter.cn) · [问题反馈](https://github.com/XDomHatter/xdomhatter-web/issues)
+[在线访问](https://xdomhatter.tech) · [问题反馈](https://github.com/XDomHatter/xdomhatter-web/issues)
 
 ## 功能特性
 
@@ -23,7 +23,7 @@
 
 **游戏中心 `/games`**
 - 游戏目录由 `config.json` 驱动，支持搜索、分类筛选与计数
-- 内置 [三维连珠（Gomoku3D）](http://xdomhatter.cn/games/gomoku3d/)：N³ 立方棋盘上的 M 子连珠，13 条方向（含体对角线）全部判胜，three.js 渲染
+- 内置 [三维连珠（Gomoku3D）](https://xdomhatter.tech/games/gomoku3d/)：N³ 立方棋盘上的 M 子连珠，13 条方向（含体对角线）全部判胜，three.js 渲染
 - 联机对战：4 位数字房间号邀请加入，服务端权威裁决落子与胜负，断线重连、单步限时、超时判负
 
 **服务端与管理后台**

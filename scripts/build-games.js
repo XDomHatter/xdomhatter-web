@@ -23,9 +23,9 @@ const DIST_DIR = path.join(ROOT, 'dist')
 const config = require(path.join(ROOT, 'config.json'))
 const gamesConf = config.games || {}
 
-// 三维连珠依赖 three.js（CDN 全局 THREE），与项目既有 CDN 引入习惯一致
-const THREE_URL =
-	'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js'
+// 三维连珠依赖 three.js（window.THREE 全局）；本地 vendored，见 src/assets/vendor/
+// 静态产物位于 /games/gomoku3d/index.html，站点根需上溯两级
+const THREE_URL = '../../assets/vendor/three.min.js'
 
 function ensureDir (dir) {
 	fs.mkdirSync(dir, { recursive: true })

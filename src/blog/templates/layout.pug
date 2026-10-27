@@ -20,8 +20,8 @@ html(lang="zh-CN")
 			link(rel="alternate" type="application/rss+xml" title=blogTitle href=`${root}blog/feed.xml`)
 
 		if math
-			link(rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css")
-			link(rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.10.0/build/styles/atom-one-dark.min.css")
+			link(rel="stylesheet" href=`${root}assets/vendor/katex/katex.min.css`)
+			link(rel="stylesheet" href=`${root}assets/vendor/highlight/atom-one-dark.css`)
 
 	body.blog-body
 		block content

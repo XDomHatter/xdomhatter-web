@@ -106,7 +106,8 @@ app.get(['/games', '/games/'], function (req, res) {
 })
 
 /* ---------------- 三维连珠（联机对局） ---------------- */
-const THREE_URL = 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js'
+// 动态模式页面挂在 /games/gomoku3d/，站点根为 /
+const THREE_URL = '/assets/vendor/three.min.js'
 
 app.get(['/games/gomoku3d', '/games/gomoku3d/'], function (req, res) {
 	if (ensureTrailingSlash(req, res)) return
