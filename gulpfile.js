@@ -95,7 +95,7 @@ gulp.task('watch', function () {
 	gulp.watch('./src/index.pug', gulp.parallel('pug'))
 	gulp.watch('./src/css/**/*.scss', gulp.parallel(['css']))
 	gulp.watch('./src/js/*.js', gulp.parallel(['js']))
-gulp.watch(['./src/blog/**/*'], gulp.series('blog'))
+gulp.watch(['./src/blog/templates/**/*', './data/posts/**/*'], gulp.series('blog'))
 gulp.watch(['./src/games/**/*', './src/js/gomoku3d-rules.js', './config.json'], gulp.series('games'))
 gulp.watch('./lib/gomoku3d-rules.js', gulp.series('games'))
 	connect.server({

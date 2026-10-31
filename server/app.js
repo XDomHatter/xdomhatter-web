@@ -13,6 +13,7 @@ const render = require('../lib/render')
 const Rules = require('../lib/gomoku3d-rules')
 const store = require('./store')
 const comments = require('./comments')
+const migrate = require('./migrate')
 const gameServer = require('./gomoku3d')
 
 const ROOT = render.ROOT
@@ -293,9 +294,10 @@ app.post('/api/posts', requireToken, function (req, res) {
 
 app.put('/api/posts/:slug', requireToken, function (req, res) {
 	try {
-		res.json({
-			post: store.adminMeta(store.updatePost(req.params.slug, req.body || {}))
-		})
+		const post = store.updatePost(req.params.slug, req.body || {})
+		// slug 变了要同步该文章文件夹内评论的 slug 字段，后台评论列表的跳转链接才不会失效
+		if (post.slug !== req.params.slug) comments.syncSlug(post.id, post.slug)
+		res.json({ post: store.adminMeta(post) })
 	} catch (err) {
 		fail(res, err)
 	}
@@ -325,11 +327,16 @@ function clientIp (req) {
 /** 公开读：只返回已通过审核的评论，不含邮箱与 IP */
 app.get('/api/comments/:slug', function (req, res) {
 	if (!COMMENTS_ON) return res.json({ comments: [], count: 0 })
-	const list = comments.listBySlug(req.params.slug)
-	res.json({
-		comments: list.map(comments.publicComment),
-		count: list.length
-	})
+	try {
+		const list = comments.listBySlug(req.params.slug)
+		res.json({
+			comments: list.map(comments.publicComment),
+			count: list.length
+		})
+	} catch (err) {
+		// slug 解析不到文章时按 404 处理（评论只存在于已发布的文章上）
+		fail(res, err)
+	}
 })
 
 /** 公开写：无需令牌，带节流与字段校验 */
@@ -357,9 +364,15 @@ app.post('/api/comments/:slug', function (req, res) {
 /* ---------------- 评论管理（复用令牌） ---------------- */
 
 app.get('/api/admin/comments', requireToken, function (req, res) {
-	const slug = req.query.slug ? String(req.query.slug) : ''
-	const list = slug ? comments.listBySlug(slug, { includePending: true }) : comments.allComments()
-	res.json({ comments: list.map(comments.adminComment), count: list.length })
+	try {
+		const slug = req.query.slug ? String(req.query.slug) : ''
+		const list = slug
+			? comments.listBySlug(slug, { includePending: true })
+			: comments.allComments()
+		res.json({ comments: list.map(comments.adminComment), count: list.length })
+	} catch (err) {
+		fail(res, err)
+	}
 })
 
 app.post('/api/admin/comments/:id/approve', requireToken, function (req, res) {
@@ -395,6 +408,8 @@ app.use(function (err, req, res, next) {
 })
 
 if (require.main === module) {
+	// 启动前先把旧版散装数据迁入 data/posts/<id>/（幂等，无旧数据时静默返回）
+	migrate.migrate()
 	if (!ADMIN_TOKEN) {
 		console.warn('[blog] 警告：未设置 BLOG_ADMIN_TOKEN，/api 接口将全部返回 503')
 	}
@@ -406,7 +421,7 @@ if (require.main === module) {
 		console.log('[timer] 计时器 /timer')
 		console.log('[blog] 文章目录 ' + store.POSTS_DIR)
 		if (COMMENTS_ON) {
-			console.log('[blog] 评论数据 ' + comments.COMMENTS_FILE)
+			console.log('[blog] 评论数据 ' + store.POSTS_DIR + ' 下各文章文件夹的 comments.json')
 		}
 	})
 	gameServer.createGameServer(server)

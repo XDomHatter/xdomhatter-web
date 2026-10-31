@@ -1,9 +1,12 @@
 /**
- * 评论存储：落盘为单个 JSON 文件，按文章 slug 分组，内存缓存按 mtime 失效。
+ * 评论存储：每篇文章一个 data/posts/<id>/comments.json，与文章 post.md 同文件夹；
+ * 内存缓存按 mtime 失效。
  *
  * 设计取舍：
- *   - 选 JSON 单文件而非 SQLite：本项目的文章源本身就是文件（src/blog/posts/*.md），
- *     评论量级在个人博客尺度内，单文件足以承载，且便于备份、diff 与人工修正。
+ *   - 评论跟文章放同一文件夹：data/ 即全部运行数据，整目录复制/备份就是全量迁移；
+ *     slug 只存在于 front-matter 与评论字段里，改 slug 不需要移动任何文件。
+ *   - 选 JSON 而非 SQLite：本项目的文章源本身就是文件（data/posts/<id>/post.md），
+ *     评论量级在个人博客尺度内，单文章单文件足以承载，且便于备份、diff 与人工修正。
  *   - 每次写操作整体重写并采用「临时文件 + rename」：rename 在同一文件系统上是原子的，
  *     可避免进程中断时留下半截 JSON 导致数据全丢。
  *   - 头像不依赖邮箱：由昵称首字符派生（initial），匿名显示默认头像；
@@ -13,12 +16,7 @@ const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 const render = require('../lib/render')
-
-const DATA_DIR = process.env.BLOG_COMMENTS_DIR
-	? path.resolve(process.env.BLOG_COMMENTS_DIR)
-	: path.join(render.ROOT, 'data')
-
-const COMMENTS_FILE = path.join(DATA_DIR, 'comments.json')
+const store = require('./store')
 
 const VERSION = 1
 
@@ -35,52 +33,66 @@ const LIMITS = {
 const RATE_WINDOW_MS = 60 * 1000
 const RATE_MAX = 3
 
-let cache = null
-let cacheMtime = -1
+/** comments.json 绝对路径 -> { mtimeMs, store } */
+const cache = new Map()
 
 /* ---------------- 基础读写 ---------------- */
-
-function ensureDir () {
-	fs.mkdirSync(DATA_DIR, { recursive: true })
-}
 
 function emptyStore () {
 	return { version: VERSION, comments: [] }
 }
 
-/** 读取落盘数据；文件不存在或损坏时回退为空结构，不让服务整体挂掉 */
-function readStore () {
+/** 由 slug 解析文章文件夹；slug 解析不到文章时返回 null（评论只允许发在已存在的文章上） */
+function postDir (slug) {
+	const post = store.findBySlug(clean(slug, LIMITS.slug))
+	return post ? path.join(store.POSTS_DIR, post.id) : null
+}
+
+/** 全部文章各自的 comments.json 路径 */
+function commentFiles () {
+	if (!fs.existsSync(store.POSTS_DIR)) return []
+	return fs
+		.readdirSync(store.POSTS_DIR, { withFileTypes: true })
+		.filter(function (entry) {
+			return entry.isDirectory()
+		})
+		.map(function (entry) {
+			return path.join(store.POSTS_DIR, entry.name, 'comments.json')
+		})
+}
+
+/** 读取单个落盘文件；文件不存在时返回空结构，损坏时降级只读，不让服务整体挂掉 */
+function readStore (file) {
 	let stat = null
 	try {
-		stat = fs.statSync(COMMENTS_FILE)
+		stat = fs.statSync(file)
 	} catch (err) {
-		cache = emptyStore()
-		cacheMtime = -1
-		return cache
+		return emptyStore() // 还没有评论：不缓存，落盘后自然可读
 	}
 
-	if (cache && cacheMtime === stat.mtimeMs) return cache
+	const hit = cache.get(file)
+	if (hit && hit.mtimeMs === stat.mtimeMs) return hit.store
 
+	let data = null
 	try {
-		const raw = fs.readFileSync(COMMENTS_FILE, 'utf8')
-		const parsed = JSON.parse(raw)
-		cache = {
+		const parsed = JSON.parse(fs.readFileSync(file, 'utf8'))
+		data = {
 			version: VERSION,
 			comments: Array.isArray(parsed.comments) ? parsed.comments : []
 		}
 	} catch (err) {
 		// 损坏文件不做静默覆盖：保留原文件，仅在内存中降级，避免把用户数据抹掉。
-		console.error('[comments] 数据文件解析失败，本次以降级只读模式运行：', err.message)
-		cache = emptyStore()
+		console.error('[comments] 数据文件解析失败，本次以降级只读模式运行：' + file, err.message)
+		data = emptyStore()
 	}
 
-	cacheMtime = stat.mtimeMs
-	return cache
+	cache.set(file, { mtimeMs: stat.mtimeMs, store: data })
+	return data
 }
 
-function writeStore (data) {
-	ensureDir()
-	const tmp = COMMENTS_FILE + '.' + process.pid + '.tmp'
+function writeStore (file, data) {
+	fs.mkdirSync(path.dirname(file), { recursive: true })
+	const tmp = file + '.' + process.pid + '.tmp'
 	const payload = JSON.stringify(
 		{ version: VERSION, comments: data.comments },
 		null,
@@ -95,11 +107,10 @@ function writeStore (data) {
 	} finally {
 		fs.closeSync(fd)
 	}
-	fs.renameSync(tmp, COMMENTS_FILE)
+	fs.renameSync(tmp, file)
 
-	const stat = fs.statSync(COMMENTS_FILE)
-	cache = data
-	cacheMtime = stat.mtimeMs
+	const stat = fs.statSync(file)
+	cache.set(file, { mtimeMs: stat.mtimeMs, store: data })
 }
 
 /* ---------------- 字段处理 ---------------- */
@@ -185,6 +196,21 @@ function adminComment (item) {
 
 /* ---------------- 查询 ---------------- */
 
+/** 在所有文章文件夹中定位一条评论（评论 id 全局唯一） */
+function locate (id) {
+	const files = commentFiles()
+	for (const file of files) {
+		const data = readStore(file)
+		const index = data.comments.findIndex(function (item) {
+			return item.id === id
+		})
+		if (index >= 0) {
+			return { file: file, data: data, index: index, item: data.comments[index] }
+		}
+	}
+	return null
+}
+
 /**
  * 取某篇文章的评论。
  * @param {string} slug 文章 slug
@@ -193,9 +219,15 @@ function adminComment (item) {
 function listBySlug (slug, opts) {
 	const options = opts || {}
 	const wanted = clean(slug, LIMITS.slug)
-	return readStore()
+	const dir = postDir(wanted)
+	if (!dir) {
+		const err = new Error('文章不存在：' + wanted)
+		err.status = 404
+		throw err
+	}
+	// 文件夹即归属，不再按 item.slug 二次过滤：文章改 slug 后旧评论依然跟随文件夹可见
+	return readStore(path.join(dir, 'comments.json'))
 		.comments.filter(function (item) {
-			if (item.slug !== wanted) return false
 			if (!options.includePending && item.approved === false) return false
 			return true
 		})
@@ -205,30 +237,32 @@ function listBySlug (slug, opts) {
 		})
 }
 
-/** 文章 slug -> 已通过评论数，列表页/构建期可用 */
+/** 文章 slug -> 已通过评论数，列表页/构建期可用（键取文章当前 slug，改 slug 后计数不丢） */
 function countBySlug () {
 	const out = Object.create(null)
-	readStore().comments.forEach(function (item) {
-		if (item.approved === false) return
-		out[item.slug] = (out[item.slug] || 0) + 1
+	store.allPosts().forEach(function (post) {
+		const file = path.join(store.POSTS_DIR, post.id, 'comments.json')
+		const count = readStore(file).comments.filter(function (item) {
+			return item.approved !== false
+		}).length
+		if (count) out[post.slug] = count
 	})
 	return out
 }
 
 function allComments () {
-	return readStore()
-		.comments.slice()
-		.sort(function (a, b) {
-			return a.created < b.created ? 1 : a.created > b.created ? -1 : 0
-		})
+	const list = []
+	commentFiles().forEach(function (file) {
+		list.push.apply(list, readStore(file).comments)
+	})
+	return list.sort(function (a, b) {
+		return a.created < b.created ? 1 : a.created > b.created ? -1 : 0
+	})
 }
 
 function findById (id) {
-	return (
-		readStore().comments.find(function (item) {
-			return item.id === id
-		}) || null
-	)
+	const found = locate(id)
+	return found ? found.item : null
 }
 
 /* ---------------- 写入 ---------------- */
@@ -252,7 +286,7 @@ function rateLimited (ipHash) {
 
 /**
  * 新增评论。
- * @param {string} slug 文章 slug
+ * @param {string} slug 文章 slug（必须是已存在的文章）
  * @param {object} data { nick, email, url, content, parent }
  * @param {object} [ctx] { ip }
  * @returns {object} 公开字段的评论对象
@@ -263,6 +297,12 @@ function addComment (slug, data, ctx) {
 	if (!wanted) {
 		const err = new Error('缺少文章 slug')
 		err.status = 400
+		throw err
+	}
+	const dir = postDir(wanted)
+	if (!dir) {
+		const err = new Error('文章不存在：' + wanted)
+		err.status = 404
 		throw err
 	}
 
@@ -302,47 +342,59 @@ function addComment (slug, data, ctx) {
 		approved: process.env.BLOG_COMMENT_REVIEW !== '1'
 	}
 
-	const store = readStore()
+	const file = path.join(dir, 'comments.json')
+	const existing = readStore(file)
 	// 复制而非原地 push：readStore 可能返回缓存对象，先解开引用再写，避免异常时缓存被污染
-	writeStore({ version: VERSION, comments: store.comments.concat([item]) })
+	writeStore(file, { version: VERSION, comments: existing.comments.concat([item]) })
 	return item
 }
 
 /** 通过审核 */
 function approveComment (id) {
-	const store = readStore()
-	const index = store.comments.findIndex(function (item) {
-		return item.id === id
-	})
-	if (index < 0) {
-		const err = new Error('评论不存在：' + id)
-		err.status = 404
-		throw err
-	}
-	const next = store.comments.slice()
-	next[index] = Object.assign({}, next[index], { approved: true })
-	writeStore({ version: VERSION, comments: next })
-	return next[index]
-}
-
-/** 删除 */
-function deleteComment (id) {
-	const store = readStore()
-	const found = store.comments.find(function (item) {
-		return item.id === id
-	})
+	const found = locate(id)
 	if (!found) {
 		const err = new Error('评论不存在：' + id)
 		err.status = 404
 		throw err
 	}
-	writeStore({
-		version: VERSION,
-		comments: store.comments.filter(function (item) {
-			return item.id !== id
-		})
+	const next = found.data.comments.slice()
+	next[found.index] = Object.assign({}, next[found.index], { approved: true })
+	writeStore(found.file, { version: VERSION, comments: next })
+	return next[found.index]
+}
+
+/** 删除 */
+function deleteComment (id) {
+	const found = locate(id)
+	if (!found) {
+		const err = new Error('评论不存在：' + id)
+		err.status = 404
+		throw err
+	}
+	writeStore(
+		found.file,
+		{
+			version: VERSION,
+			comments: found.data.comments.filter(function (item) {
+				return item.id !== id
+			})
+		}
+	)
+	return found.item
+}
+
+/** 文章改 slug 后同步该文件夹内评论的 slug 字段，保持后台列表的跳转链接有效 */
+function syncSlug (id, newSlug) {
+	const file = path.join(store.POSTS_DIR, id, 'comments.json')
+	const data = readStore(file)
+	if (!data.comments.length) return
+	let changed = false
+	const next = data.comments.map(function (item) {
+		if (item.slug === newSlug) return item
+		changed = true
+		return Object.assign({}, item, { slug: newSlug })
 	})
-	return found
+	if (changed) writeStore(file, { version: VERSION, comments: next })
 }
 
 /** 仅测试用：清空节流计数与内存缓存，避免用例之间互相影响 */
@@ -352,13 +404,10 @@ function resetRateLimit () {
 
 /** 仅测试用：丢弃缓存，强制下次从磁盘重读 */
 function resetCache () {
-	cache = null
-	cacheMtime = -1
+	cache.clear()
 }
 
 module.exports = {
-	DATA_DIR: DATA_DIR,
-	COMMENTS_FILE: COMMENTS_FILE,
 	LIMITS: LIMITS,
 	listBySlug: listBySlug,
 	countBySlug: countBySlug,
@@ -367,6 +416,7 @@ module.exports = {
 	addComment: addComment,
 	approveComment: approveComment,
 	deleteComment: deleteComment,
+	syncSlug: syncSlug,
 	publicComment: publicComment,
 	adminComment: adminComment,
 	resetRateLimit: resetRateLimit,

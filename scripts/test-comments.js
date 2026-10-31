@@ -2,12 +2,14 @@
  * 评论功能回归测试：覆盖「持久化存储」与「HTTP 接口」两层。
  *
  * 重点保护的行为：
- *   1. 落盘持久化——进程重新加载模块后数据仍在（这是需求的硬约束）。
- *   2. 邮箱等隐私字段不出现在公开响应里。
- *   3. 无令牌不能读/删后台评论；有令牌可以。
- *   4. 字段校验与提交节流。
- *   5. 文章页服务端渲染出评论区，且评论内容被转义（防 XSS）。
- *   6. 静态产物中评论表单没有可用的提交目标（submitUrl 为空）。
+ *   1. 落盘持久化——评论落在文章自己的文件夹（<id>/comments.json），进程重载后数据仍在。
+ *   2. 评论只能发表在已存在的文章上（slug 解析不到文章按 404 处理）。
+ *   3. 邮箱等隐私字段不出现在公开响应里。
+ *   4. 无令牌不能读/删后台评论；有令牌可以。
+ *   5. 字段校验与提交节流。
+ *   6. 文章页服务端渲染出评论区，且评论内容被转义（防 XSS）。
+ *   7. 静态产物中评论表单没有可用的提交目标（submitUrl 为空）。
+ *   8. 外部直接改 <id>/comments.json 或 <id>/post.md 都能被 mtime 检测到。
  *
  * 运行：node scripts/test-comments.js
  */
@@ -16,10 +18,10 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 
-/* 关键：在 require 业务模块之前把数据目录指向临时目录，
-   避免测试污染项目真实的 data/comments.json。 */
+/* 关键：在 require 业务模块之前把文章目录指向临时目录，
+   测试数据全部落在沙箱里，不污染项目真实的 data/ 目录。 */
 const TMP_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'xdblog-comments-'))
-process.env.BLOG_COMMENTS_DIR = TMP_DIR
+process.env.BLOG_POSTS_DIR = TMP_DIR
 process.env.BLOG_ADMIN_TOKEN = 'test-token-please-change'
 
 let pass = 0
@@ -40,7 +42,12 @@ const store = require('../server/store')
 const render = require('../lib/render')
 const app = require('../server/app')
 
-const FILE = path.join(TMP_DIR, 'comments.json')
+/** 某篇文章自己的评论文件：data/posts/<id>/comments.json */
+function commentsFile (slug) {
+	const post = store.findBySlug(slug)
+	if (!post) throw new Error('测试文章不存在：' + slug)
+	return path.join(TMP_DIR, post.id, 'comments.json')
+}
 
 function req (port, method, urlPath, body, headers) {
 	return new Promise(function (resolve, reject) {
@@ -80,19 +87,61 @@ function req (port, method, urlPath, body, headers) {
 }
 
 async function main () {
+	/* ============ 〇、启动服务并通过 admin 接口创建测试文章 ============ */
+	// 评论现在只能发表在已存在的文章上，所有用例先用 admin 接口把文章建好。
+	// http-post 日期最新，保证后面 publishedPosts()[0] 稳定命中这篇初始零评论的文章。
+	const server = http.createServer(app)
+	await new Promise(function (r) {
+		server.listen(0, '127.0.0.1', r)
+	})
+	const port = server.address().port
+	const TOKEN = { 'x-admin-token': 'test-token-please-change' }
+
+	const postIds = {}
+	const seedPosts = [
+		{ slug: 'demo-post', date: '2026-01-01' },
+		{ slug: 'throttle-post', date: '2026-01-01' },
+		{ slug: 'review-post', date: '2026-01-01' },
+		{ slug: 'http-post', date: '2026-01-02' }
+	]
+	for (const seed of seedPosts) {
+		const res = await req(port, 'POST', '/api/posts', {
+			title: seed.slug,
+			slug: seed.slug,
+			date: seed.date,
+			tags: ['test'],
+			summary: '测试用文章',
+			body: '正文',
+			draft: false
+		}, TOKEN)
+		ok(
+			'admin 接口创建文章 ' + seed.slug,
+			res.status === 201 && res.json && res.json.post && !!res.json.post.id,
+			'实际 ' + res.status
+		)
+		postIds[seed.slug] = res.json && res.json.post ? res.json.post.id : ''
+	}
+	ok(
+		'文章本体落在文章目录的独立文件夹内',
+		fs.existsSync(path.join(TMP_DIR, postIds['demo-post'], 'post.md'))
+	)
+
 	/* ============ 一、存储层：持久化 ============ */
 
 	comments.resetRateLimit()
 	comments.resetCache()
 
-	ok('初始状态数据文件不存在', !fs.existsSync(FILE))
+	const FILE = commentsFile('demo-post')
+	ok('初始状态评论文件不存在', !fs.existsSync(FILE))
 
 	const first = comments.addComment(
 		'demo-post',
 		{ nick: '阿甲', email: 'a@example.com', content: '持久化验证' },
 		{ ip: '10.0.0.1' }
 	)
-	ok('新增评论后数据文件已生成', fs.existsSync(FILE))
+	ok('新增评论后文章文件夹内已生成 comments.json', fs.existsSync(FILE))
+	ok('评论实际落在该文章自己的文件夹内',
+		path.dirname(FILE) === path.join(TMP_DIR, postIds['demo-post']))
 	ok('返回值带 id', !!first.id)
 
 	// 模拟「进程重启」：抛掉内存缓存，强制从磁盘重读
@@ -104,7 +153,7 @@ async function main () {
 		'读到 ' + afterReload.length + ' 条'
 	)
 
-	/* 直接改磁盘文件也应被 mtime 检测到（对齐 store.js 的既有能力） */
+	/* 直接改磁盘上的 comments.json 也应被 mtime 检测到（对齐 store.js 的既有能力） */
 	const disk = JSON.parse(fs.readFileSync(FILE, 'utf8'))
 	disk.comments.push({
 		id: 'external-1',
@@ -123,7 +172,25 @@ async function main () {
 	// 改文件后 mtime 可能同毫秒，显式清缓存保证断言稳定
 	comments.resetCache()
 	ok(
-		'外部直接改文件也能被读到',
+		'外部直接改评论文件也能被读到',
+		comments.listBySlug('demo-post').length === 2,
+		'实际 ' + comments.listBySlug('demo-post').length
+	)
+
+	/* 外部直接改 <id>/post.md 也应被 mtime 检测到，且评论不受影响 */
+	const postFile = path.join(TMP_DIR, postIds['demo-post'], 'post.md')
+	const rawPost = fs.readFileSync(postFile, 'utf8')
+	// 改动 front-matter 的 summary 并回写：只有缓存真正按 mtime 失效，新摘要才会被读到
+	fs.writeFileSync(postFile, rawPost.replace('测试用文章', '改盘后的摘要'), 'utf8')
+	comments.resetCache()
+	ok(
+		'外部直接改 post.md 能被 store 感知',
+		store.findBySlug('demo-post') &&
+			store.findBySlug('demo-post').summary === '改盘后的摘要',
+		'实际 ' + JSON.stringify(store.findBySlug('demo-post').summary)
+	)
+	ok(
+		'外部直接改 post.md 不影响评论读取',
 		comments.listBySlug('demo-post').length === 2,
 		'实际 ' + comments.listBySlug('demo-post').length
 	)
@@ -152,6 +219,13 @@ async function main () {
 		ok('缺少 slug 被拒绝', false)
 	} catch (err) {
 		ok('缺少 slug 被拒绝', err.status === 400, 'status ' + err.status)
+	}
+
+	try {
+		comments.addComment('no-such-post', { nick: 'x', content: 'hi' })
+		ok('slug 解析不到文章被拒绝（404）', false)
+	} catch (err) {
+		ok('slug 解析不到文章被拒绝（404）', err.status === 404, 'status ' + err.status)
 	}
 
 	const noNick = comments.addComment(
@@ -224,18 +298,18 @@ async function main () {
 
 	/* ============ 五、HTTP 接口层 ============ */
 
-	const server = http.createServer(app)
-	await new Promise(function (r) {
-		server.listen(0, '127.0.0.1', r)
-	})
-	const port = server.address().port
-	const TOKEN = { 'x-admin-token': 'test-token-please-change' }
-
 	comments.resetRateLimit()
 
 	const posts = store.publishedPosts()
 	ok('存在可用于测试的已发布文章', posts.length > 0)
+	ok('最新文章是接口测试专用的 http-post', posts[0].slug === 'http-post', '实际 ' + posts[0].slug)
 	const slug = posts[0].slug
+
+	/* --- 行为收紧：评论只存在于已发布的文章上 --- */
+	const unknownRead = await req(port, 'GET', '/api/comments/no-such-post')
+	ok('GET 未知文章的评论返回 404', unknownRead.status === 404, '实际 ' + unknownRead.status)
+	const unknownWrite = await req(port, 'POST', '/api/comments/no-such-post', { content: 'x' })
+	ok('POST 未知文章的评论返回 404', unknownWrite.status === 404, '实际 ' + unknownWrite.status)
 
 	/* --- 公开读 --- */
 	const emptyRead = await req(port, 'GET', '/api/comments/' + slug)
@@ -259,6 +333,10 @@ async function main () {
 
 	const afterWrite = await req(port, 'GET', '/api/comments/' + slug)
 	ok('写入后可读回', afterWrite.json && afterWrite.json.count === 1)
+	ok(
+		'接口评论落在文章自己的文件夹内',
+		fs.existsSync(commentsFile(slug))
+	)
 
 	/* --- 写校验 --- */
 	const badWrite = await req(port, 'POST', '/api/comments/' + slug, { content: '' })
@@ -398,12 +476,13 @@ async function main () {
 	ok('默认模式新评论已通过审核', pending.approved === true)
 	ok('默认模式下公开列表可见', comments.listBySlug('review-post').length === 1)
 
-	// 手动置为待审核，模拟先审后发场景
-	const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'))
+	// 手动置为待审核，模拟先审后发场景（直接改该文章文件夹里的 comments.json）
+	const REVIEW_FILE = commentsFile('review-post')
+	const raw = JSON.parse(fs.readFileSync(REVIEW_FILE, 'utf8'))
 	raw.comments.forEach(function (c) {
 		if (c.id === pending.id) c.approved = false
 	})
-	fs.writeFileSync(FILE, JSON.stringify(raw, null, 2), 'utf8')
+	fs.writeFileSync(REVIEW_FILE, JSON.stringify(raw, null, 2), 'utf8')
 	comments.resetCache()
 
 	ok('待审核评论不出现在公开列表', comments.listBySlug('review-post').length === 0)

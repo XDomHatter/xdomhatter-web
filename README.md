@@ -14,7 +14,7 @@
 - Gulp 4 构建管线：Pug / Less / Babel 编译压缩，产物体积极小
 
 **博客 `/blog`**
-- 文章以 Markdown 文件为数据源（`src/blog/posts/*.md`），front-matter 声明标题、日期、标签、摘要
+- 文章以 Markdown 文件为数据源（`data/posts/<id>/post.md`），front-matter 声明标题、日期、标签、摘要与 slug
 - `markdown-it` + KaTeX 数学公式 + highlight.js 代码高亮 + 标题锚点
 - 标签索引与筛选、文章检索、阅读时长估算
 - 评论系统：无需注册即可评论，支持回复、节流限频、IP 加盐哈希落盘、先审后发（可选）
@@ -76,11 +76,11 @@ BLOG_ADMIN_TOKEN=你的令牌 npm start   # 默认监听 80 端口，可用 XDHP
 博客渲染核心在 `lib/render.js`，静态构建与动态服务共用同一条 Markdown / KaTeX 管线，行为完全一致：
 
 1. **纯静态模式**：`npm run build` 把所有文章预渲染成 `dist/blog/` 下的 HTML（含 `posts.json` 与 `feed.xml`）。静态产物同样展示已有评论，但没有可用的提交接口。适合部署到 GitHub Pages 等任意静态托管。
-2. **动态模式**（`npm start`）：`server/app.js` 在请求时实时渲染 Markdown，评论读写、后台管理、联机对局全部可用。修改 `src/blog/posts/` 下的文件立即生效，无需重新构建。
+2. **动态模式**（`npm start`）：`server/app.js` 在请求时实时渲染 Markdown，评论读写、后台管理、联机对局全部可用。修改 `data/posts/` 下的文件立即生效，无需重新构建。
 
 ## 写博客
 
-在 `src/blog/posts/` 下新建 `YYYY-MM-DD-slug.md`：
+每篇文章在 `data/posts/` 下占一个文件夹（`<id>` 为 8 位随机 hex，后台创建时自动生成），内含文章本体 `post.md`，它收到的评论也存在同文件夹的 `comments.json`：
 
 ```markdown
 ---
@@ -88,12 +88,13 @@ title: 文章标题
 date: 2026-09-13
 tags: [meta, build-tools]
 summary: 一句话摘要，显示在列表页与 RSS 中。
+slug: hello-blog
 ---
 
 正文支持 GFM、代码高亮与行内/块级数学公式：$E = mc^2$
 ```
 
-- 文件名中日期之后的路径即文章 slug（如 `2026-09-13-hello-blog.md` → `/blog/posts/hello-blog`）
+- front-matter 的 `slug` 即文章对外 URL（如 `slug: hello-blog` → `/blog/posts/hello-blog`）；改 slug 只改这一个字段，不会移动或重命名任何文件
 - 加 `draft: true` 的文章不会发布
 - 动态模式下也可以直接在 `/admin` 后台写文章与管理评论
 
@@ -107,10 +108,11 @@ summary: 一句话摘要，显示在列表页与 RSS 中。
 | --- | --- | --- |
 | `BLOG_ADMIN_TOKEN` | `/admin` 与 `/api` 管理接口的鉴权令牌，**生产环境必须设置** | 未设置时管理接口一律返回 503 |
 | `XDHPAGE_PORT` | 服务监听端口 | `80` |
-| `BLOG_POSTS_DIR` | 文章目录 | `src/blog/posts/` |
-| `BLOG_COMMENTS_DIR` | 评论数据目录 | `data/` |
+| `BLOG_POSTS_DIR` | 文章目录（评论存在其中各文章文件夹内） | `data/posts/` |
 | `BLOG_COMMENT_REVIEW` | 设为 `1` 开启评论先审后发 | 关闭（即时可见） |
 | `BLOG_COMMENT_SALT` | 评论 IP 哈希盐值 | 内置默认值 |
+
+> 运行数据全部集中在 `data/` 目录（文章与评论），**`data/` 是唯一需要备份的运行数据目录**。旧版数据（`src/blog/posts/*.md` + `data/comments.json`）会在启动或构建时自动迁移进 `data/posts/`，原文件分别以删除和 `comments.json.bak` 兜底。
 
 ## 目录结构
 
@@ -124,14 +126,14 @@ summary: 一句话摘要，显示在列表页与 RSS 中。
 │   ├── js/                # 前端脚本（流体背景、博客交互、游戏）
 │   ├── assets/            # 图片、音频等静态资源
 │   ├── timer.html         # 计时器页面
-│   ├── blog/              # 博客：posts/*.md + Pug 模板
+│   ├── blog/              # 博客：Pug 模板（文章与评论在 data/posts/）
 │   └── games/             # 游戏 Pug 模板
 ├── lib/                   # 前后端共享模块
 │   ├── render.js          # Markdown / Pug 渲染核心（静态与动态共用一条管线）
 │   └── gomoku3d-rules.js  # 三维连珠规则（唯一真实来源）
 ├── scripts/               # 构建脚本与测试脚本
 ├── server/                # Express 服务端（动态博客、评论、后台、联机对局）
-├── data/                  # 运行时数据（评论 JSON）
+├── data/                  # 运行时数据：文章与评论（唯一需要备份的目录，不入库）
 └── dist/                  # 构建产物
 ```
 

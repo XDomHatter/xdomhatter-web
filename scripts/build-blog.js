@@ -5,7 +5,7 @@ const render = require('../lib/render')
 const comments = require('../server/comments')
 
 const ROOT = render.ROOT
-const POSTS_DIR = path.join(ROOT, 'src', 'blog', 'posts')
+const POSTS_DIR = path.join(ROOT, 'data', 'posts')
 const OUT_DIR = path.join(ROOT, 'dist', 'blog')
 const DIST_DIR = path.join(ROOT, 'dist')
 
@@ -20,22 +20,30 @@ const COMMENTS_ON = blogConf.comments !== false
 
 const esc = render.esc
 
+/** 每篇文章一个 <id>/post.md（front-matter 携带 slug），逐文件夹扫描 */
 function readPosts () {
 	if (!fs.existsSync(POSTS_DIR)) return []
 	return render.sortByDateDesc(
 		fs
-			.readdirSync(POSTS_DIR)
-			.filter(function (file) {
-				return /\.md$/i.test(file)
+			.readdirSync(POSTS_DIR, { withFileTypes: true })
+			.filter(function (entry) {
+				return entry.isDirectory()
 			})
-			.map(function (file) {
-				return render.parsePost(
-					file,
-					fs.readFileSync(path.join(POSTS_DIR, file), 'utf8')
-				)
+			.map(function (entry) {
+				const file = path.join(entry.name, 'post.md')
+				try {
+					return render.parsePost(
+						file,
+						fs.readFileSync(path.join(POSTS_DIR, file), 'utf8')
+					)
+				} catch (err) {
+					if (err.code === 'ENOENT') return null
+					throw err
+				}
 			})
+			.filter(Boolean)
 			.filter(function (post) {
-				return !post.draft && post.date
+				return post.slug && !post.draft && post.date
 			})
 	)
 }
@@ -114,6 +122,8 @@ function checkLinks () {
 }
 
 function build () {
+	// 静态构建与动态服务读同一目录：先做一次幂等迁移，保证未迁移机器上 npm run blog 也能拿到文章
+	require('../server/migrate').migrate()
 	const posts = readPosts()
 	posts.forEach(function (post) {
 		post.readingTime = Math.max(1, Math.round(post.words / 350))
