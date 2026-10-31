@@ -1,0 +1,4 @@
+allowBuilds:
+  # 这些依赖的 postinstall 仅打印广告/捐赠信息，与构建无关，禁止执行即可
+  core-js: false
+  es5-ext: false

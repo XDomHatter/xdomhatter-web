@@ -14,6 +14,11 @@ body {
 	margin: 0;
 	padding: 0;
 	border: 0;
+	// 页面深色均来自内部元素（canvas/卡片），html/body 未设背景时是白色。
+	// iOS Safari 回弹或地址栏伸缩时会露出 body 背景，用与 splash 底色一致的深色兜底。
+	background: #1e1f21;
+	// 禁止滚动回弹/滚动链（iOS 16+、Chrome 63+ 生效，旧环境由上面的背景色兜底）
+	overscroll-behavior: none;
 }
 
 body {
@@ -25,7 +30,6 @@ body {
 	-webkit-box-pack: center;
 	-ms-flex-pack: center;
 	justify-content: center;
-	min-height: 100vh;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	-webkit-touch-callout: none;

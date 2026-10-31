@@ -14,6 +14,16 @@
 	--color-title: @color-title;
 	--color-content: @color-content;
 	--font-alt: @font-alt;
+	// 移动端 Safari 的 100vh 是地址栏收起后的最大视口高度，大于可视区域，
+	// 会把页面撑出一段可滚动空白并在回弹时露出白色背景。
+	// 使用 dvh（贴合当前可视视口）优先，不支持的环境回退到 100vh。
+	--vh-full: 100vh;
+}
+
+@supports (height: 100dvh) {
+	:root {
+		--vh-full: 100dvh;
+	}
 }
 
 .fade {

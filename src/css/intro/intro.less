@@ -4,7 +4,9 @@
 }
 
 .shape {
-	height: 100vh;
+	// CSS 规则会覆盖 intro.pug 中 svg 的 height="100vh" 属性，
+	// 让 splash 底部的弧形贴合当前可视视口
+	height: var(--vh-full);
 	width: 100%;
 	display: block;
 	background: transparent;
